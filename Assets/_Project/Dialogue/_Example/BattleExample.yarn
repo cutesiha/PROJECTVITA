@@ -1,0 +1,25 @@
+// ─────────────────────────────────────────────
+// 전투 예시 (에피소드 BattleTest). 전투 데이터는 Data/Battle_*.csv에 있다.
+// <<battle 조우id>> 로 전투에 들어가고, 끝나면 Battle_Encounter.csv의 win_node 또는 lose_node로 돌아온다.
+// ─────────────────────────────────────────────
+
+title: BattleTest_Start
+---
+<<bg ruins_night fade 0.6>>
+전투 예시다. 아군 셋과 인조 생물 둘이 싸운다.
+스킬 버튼(또는 숫자 키 1~4)으로 행동을 고르고, 대상은 적을 클릭한다. 오른쪽 클릭이나 뒤로 버튼으로 다시 고른다.
+<<battle Tutorial_01>>
+===
+
+title: BattleTest_Win
+---
+<<bg ruins_night cut>>
+이겼다. 전투가 끝나면 이렇게 대사로 돌아온다.
+next_episode가 비어 있으니 이 노드가 끝나면 타이틀로 돌아간다.
+===
+
+title: BattleTest_Lose
+---
+// Tutorial_01은 lose_rule이 retry라서 지면 다시 싸운다. 이 노드는 continue일 때 쓰인다.
+졌다.
+===

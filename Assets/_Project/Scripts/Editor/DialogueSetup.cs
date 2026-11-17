@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using ProjectVita.Battle;
 using ProjectVita.Core;
+using ProjectVita.Exploration;
 using ProjectVita.Menus;
 using ProjectVita.Story;
 using TMPro;
@@ -37,6 +39,8 @@ namespace ProjectVita.EditorTools
         const string ScenesDir = "Assets/_Project/Scenes";
         const string TitleScenePath = ScenesDir + "/" + EpisodeFlow.TitleSceneName + ".unity";
         const string StoryScenePath = ScenesDir + "/" + EpisodeFlow.StorySceneName + ".unity";
+        const string ExplorationScenePath = ScenesDir + "/" + EpisodeFlow.ExplorationSceneName + ".unity";
+        const string BattleScenePath = ScenesDir + "/" + EpisodeFlow.BattleSceneName + ".unity";
 
         // 기준 해상도. Player Settings(1단계)와 같다.
         static readonly Vector2 RefResolution = new Vector2(1920, 1080);
@@ -52,7 +56,7 @@ namespace ProjectVita.EditorTools
         static readonly Color ColSubText = Hex("#9AA0A6");
         static readonly Color ColDev = new Color(0.63f, 1f, 0.63f, 0.9f);
 
-        [MenuItem(MenuRoot + "대사 씬 생성 (Title, Story)", priority = 10)]
+        [MenuItem(MenuRoot + "씬 생성 (Title, Story, Exploration, Battle)", priority = 10)]
         public static void BuildAll()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -65,13 +69,16 @@ namespace ProjectVita.EditorTools
                 return;
             }
             AssetCatalogBuilder.Rebuild(log: false);
+            DataImporter.ImportAll();
 
             BuildStoryScene(episodesCsv);
+            BuildExplorationScene(episodesCsv);
+            BuildBattleScene(episodesCsv);
             BuildTitleScene(episodesCsv);
             ApplyBuildScenes();
 
             EditorSceneManager.OpenScene(TitleScenePath, OpenSceneMode.Single);
-            Debug.Log("[Setup] 대사 씬 생성 완료: Title, Story. Title 씬에서 플레이한다.");
+            Debug.Log("[Setup] 씬 생성 완료: Title, Story, Exploration, Battle. Title 씬에서 플레이한다.");
 
             ValidateEpisodes();
         }
@@ -104,7 +111,30 @@ namespace ProjectVita.EditorTools
 
         static void BuildStoryScene(TextAsset episodesCsv)
         {
-            var scene = OpenClean(StoryScenePath);
+            var d = BuildDialogueScene(StoryScenePath);
+            var director = d.system.AddComponent<StoryDirector>();
+            SetField(director, "runner", d.runner);
+            SetField(director, "stage", d.stage);
+            SetField(director, "episodesCsv", episodesCsv);
+
+            EditorSceneManager.SaveScene(d.scene, StoryScenePath);
+            Debug.Log("[Setup] Story 씬 생성: " + StoryScenePath);
+        }
+
+        sealed class DialogueScene
+        {
+            public Scene scene;
+            public Canvas canvas;
+            public StoryStage stage;
+            public DialogueRunner runner;
+            public GameObject system;
+            public RectTransform dialogueBox;
+        }
+
+        /// <summary>대사가 나오는 씬의 공통 부분: 무대, 대사창, 선택지, 화면 효과, 일시정지, 개발용 표시, DialogueRunner.</summary>
+        static DialogueScene BuildDialogueScene(string path)
+        {
+            var scene = OpenClean(path);
             CreateCameraAndLight();
             CreateEventSystem();
 
@@ -191,37 +221,10 @@ namespace ProjectVita.EditorTools
             SetField(stage, "flash", flash);
             SetField(stage, "fadeOverlay", fade);
 
-            // ---- 일시정지와 설정
-            var pauseCanvas = CreateCanvas("PauseCanvas", 50);
-            var pausePanel = CreateImage("PausePanel", pauseCanvas.transform, new Color(0, 0, 0, 0.78f), raycast: true);
-            Stretch(pausePanel.rectTransform);
-            var pauseTitle = CreateText("Title", pausePanel.transform, "일시정지", 60, ColText, TextAlignmentOptions.Center);
-            pauseTitle.fontStyle = FontStyles.Bold;
-            SetRect(pauseTitle.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 250), new Vector2(800, 90));
-            var pauseList = CreateVerticalList("Buttons", pausePanel.transform, new Vector2(0, -20), 440);
-            var resumeButton = CreateButton("ResumeButton", pauseList, "계속하기", 34, 84);
-            var settingsButton = CreateButton("SettingsButton", pauseList, "설정", 34, 84);
-            var titleButton = CreateButton("TitleButton", pauseList, "타이틀로", 34, 84);
-            var quitButton = CreateButton("QuitButton", pauseList, "게임 종료", 34, 84);
-            var settings = CreateSettingsPanel(pauseCanvas);
+            CreatePauseCanvas(menuButton);
+            CreateDevCanvas();
 
-            var pause = pauseCanvas.gameObject.AddComponent<PauseMenu>();
-            SetField(pause, "panel", pausePanel.gameObject);
-            SetField(pause, "openButton", menuButton);
-            SetField(pause, "resumeButton", resumeButton);
-            SetField(pause, "settingsButton", settingsButton);
-            SetField(pause, "titleButton", titleButton);
-            SetField(pause, "quitButton", quitButton);
-            SetField(pause, "settings", settings);
-
-            // ---- 개발용 표시
-            var devCanvas = CreateCanvas("DevCanvas", 100);
-            var devText = CreateText("DevOverlay", devCanvas.transform, "", 20, ColDev, TextAlignmentOptions.TopLeft);
-            SetRect(devText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(20, -16), new Vector2(1100, 420));
-            var overlay = devText.gameObject.AddComponent<DevOverlay>();
-            SetField(overlay, "text", devText);
-
-            // ---- 대화 시스템 (Runner + Presenter + Director)
+            // ---- 대화 시스템 (Runner + Presenter)
             var system = new GameObject("DialogueSystem");
             var presenter = system.AddComponent<StoryPresenter>();
             SetField(presenter, "dialogueBox", box.gameObject);
@@ -239,19 +242,291 @@ namespace ProjectVita.EditorTools
             var yarnProject = AssetDatabase.LoadAssetAtPath<YarnProject>(YarnProjectPath);
             if (yarnProject == null) Debug.LogError("[Setup] Yarn Project를 로드하지 못했다: " + YarnProjectPath);
             so.FindProperty("yarnProject").objectReferenceValue = yarnProject;
-            so.FindProperty("autoStart").boolValue = false; // StoryDirector가 Episodes.csv의 start_node로 시작한다.
+            so.FindProperty("autoStart").boolValue = false; // StoryDirector나 ExplorationController가 노드를 골라 시작한다.
             var presenters = so.FindProperty("dialoguePresenters");
             presenters.arraySize = 1;
             presenters.GetArrayElementAtIndex(0).objectReferenceValue = presenter;
             so.ApplyModifiedPropertiesWithoutUndo();
 
-            var director = system.AddComponent<StoryDirector>();
-            SetField(director, "runner", runner);
-            SetField(director, "stage", stage);
-            SetField(director, "episodesCsv", episodesCsv);
+            return new DialogueScene { scene = scene, canvas = canvas, stage = stage, runner = runner, system = system, dialogueBox = boxRt };
+        }
 
-            EditorSceneManager.SaveScene(scene, StoryScenePath);
-            Debug.Log("[Setup] Story 씬 생성: " + StoryScenePath);
+        static void CreatePauseCanvas(Button menuButton)
+        {
+            var pauseCanvas = CreateCanvas("PauseCanvas", 50);
+            var pausePanel = CreateImage("PausePanel", pauseCanvas.transform, new Color(0, 0, 0, 0.78f), raycast: true);
+            Stretch(pausePanel.rectTransform);
+            var pauseTitle = CreateText("Title", pausePanel.transform, "일시정지", 60, ColText, TextAlignmentOptions.Center);
+            pauseTitle.fontStyle = FontStyles.Bold;
+            SetRect(pauseTitle.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 310), new Vector2(800, 90));
+            var pauseList = CreateVerticalList("Buttons", pausePanel.transform, new Vector2(0, 50), 440);
+            var resumeButton = CreateButton("ResumeButton", pauseList, "계속하기", 34, 84);
+            var settingsButton = CreateButton("SettingsButton", pauseList, "설정", 34, 84);
+            var titleButton = CreateButton("TitleButton", pauseList, "타이틀로", 34, 84);
+            var quitButton = CreateButton("QuitButton", pauseList, "게임 종료", 34, 84);
+            var settings = CreateSettingsPanel(pauseCanvas);
+
+            var pause = pauseCanvas.gameObject.AddComponent<PauseMenu>();
+            SetField(pause, "panel", pausePanel.gameObject);
+            SetField(pause, "openButton", menuButton);
+            SetField(pause, "resumeButton", resumeButton);
+            SetField(pause, "settingsButton", settingsButton);
+            SetField(pause, "titleButton", titleButton);
+            SetField(pause, "quitButton", quitButton);
+            SetField(pause, "settings", settings);
+        }
+
+        static void CreateDevCanvas()
+        {
+            var devCanvas = CreateCanvas("DevCanvas", 100);
+            var devText = CreateText("DevOverlay", devCanvas.transform, "", 20, ColDev, TextAlignmentOptions.TopLeft);
+            SetRect(devText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(20, -16), new Vector2(1100, 420));
+            var overlay = devText.gameObject.AddComponent<DevOverlay>();
+            SetField(overlay, "text", devText);
+        }
+
+        // ================================================================ Exploration 씬
+
+        static void BuildExplorationScene(TextAsset episodesCsv)
+        {
+            var d = BuildDialogueScene(ExplorationScenePath);
+
+            // 탐색 UI는 무대 위, 대사창 아래에 둔다.
+            var layer = CreateRect("ExplorationLayer", d.canvas.transform);
+            Stretch(layer);
+            layer.SetSiblingIndex(d.dialogueBox.GetSiblingIndex());
+
+            var hotspots = CreateRect("Hotspots", layer);
+            Stretch(hotspots);
+            var hotspotTemplate = CreateImage("HotspotTemplate", hotspots, Color.clear, raycast: true);
+            var hotspotLabel = CreateText("Label", hotspotTemplate.transform, "이름", 28, ColText, TextAlignmentOptions.Center);
+            hotspotLabel.fontStyle = FontStyles.Bold;
+            hotspotLabel.outlineWidth = 0.2f;
+            hotspotLabel.outlineColor = new Color32(0, 0, 0, 255);
+            SetRect(hotspotLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 0), new Vector2(0, 6), new Vector2(120, 80));
+            var hotspot = hotspotTemplate.gameObject.AddComponent<ExplorationHotspot>();
+            SetField(hotspot, "fill", hotspotTemplate);
+            SetField(hotspot, "label", hotspotLabel);
+
+            // 장소 이름 (위쪽 가운데. 왼쪽 위는 개발용 표시 자리)
+            var plate = CreateImage("LocationPlate", layer, ColAccent);
+            plate.gameObject.AddComponent<UISkew>().Skew = 24f;
+            SetRect(plate.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -26), new Vector2(420, 66));
+            var plateText = CreateText("LocationName", plate.transform, "장소", 34, ColText, TextAlignmentOptions.Center);
+            plateText.fontStyle = FontStyles.Bold;
+            Stretch(plateText.rectTransform, 16, 4);
+
+            // 지도 버튼 (메뉴 버튼 아래)
+            var mapButton = CreateButton("MapButton", layer, "지도", 26, 0, skew: 14f);
+            SetRect((RectTransform)mapButton.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-28, -86), new Vector2(190, 52));
+
+            // 지도 화면
+            var map = CreateImage("MapView", layer, new Color(0.04f, 0.045f, 0.055f, 0.96f), raycast: true);
+            Stretch(map.rectTransform);
+            var mapTitle = CreateText("Title", map.transform, "지도", 64, ColText, TextAlignmentOptions.Left);
+            mapTitle.fontStyle = FontStyles.Bold;
+            SetRect(mapTitle.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(170, -120), new Vector2(800, 100));
+            var mapHint = CreateText("Hint", map.transform, "갈 곳을 고른다. 조건을 채우면 새 장소가 나타난다.", 26, ColSubText, TextAlignmentOptions.Left);
+            SetRect(mapHint.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(176, -220), new Vector2(1200, 50));
+            var mapBand = CreateImage("AccentBand", map.transform, ColAccent);
+            mapBand.gameObject.AddComponent<UISkew>().Skew = 120f;
+            SetRect(mapBand.rectTransform, new Vector2(0, 0), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(60, 0), new Vector2(26, 0));
+            var mapList = CreateRect("List", map.transform);
+            SetRect(mapList, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(170, -300), new Vector2(560, 0));
+            var mapLayout = mapList.gameObject.AddComponent<VerticalLayoutGroup>();
+            mapLayout.spacing = 16;
+            mapLayout.childControlWidth = true;
+            mapLayout.childControlHeight = true;
+            mapLayout.childForceExpandHeight = false;
+            mapList.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var mapItem = CreateButton("MapItemTemplate", mapList, "장소", 34, 88, skew: 22f);
+
+            var controller = d.system.AddComponent<ExplorationController>();
+            SetField(controller, "runner", d.runner);
+            SetField(controller, "stage", d.stage);
+            SetField(controller, "episodesCsv", episodesCsv);
+            SetField(controller, "hotspotRoot", hotspots);
+            SetField(controller, "hotspotTemplate", hotspot);
+            SetField(controller, "locationPlate", plate.gameObject);
+            SetField(controller, "locationName", plateText);
+            SetField(controller, "mapButton", mapButton);
+            SetField(controller, "mapView", map.gameObject);
+            SetField(controller, "mapListRoot", mapList);
+            SetField(controller, "mapItemTemplate", mapItem);
+
+            EditorSceneManager.SaveScene(d.scene, ExplorationScenePath);
+            Debug.Log("[Setup] Exploration 씬 생성: " + ExplorationScenePath);
+        }
+
+        // ================================================================ Battle 씬
+
+        static void BuildBattleScene(TextAsset episodesCsv)
+        {
+            var scene = OpenClean(BattleScenePath);
+            CreateCameraAndLight();
+            CreateEventSystem();
+
+            var canvas = CreateCanvas("BattleCanvas", 0);
+            var bg = CreateImage("Background", canvas.transform, Hex("#15181E"));
+            Stretch(bg.rectTransform);
+            var shake = CreateRect("ShakeRoot", canvas.transform);
+            Stretch(shake);
+
+            // 적 줄 (위쪽 가운데), 아군 줄 (아래 왼쪽)
+            var enemyRow = CreateRect("EnemyRow", shake);
+            SetRect(enemyRow, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(-120, -90), new Vector2(1300, 560));
+            var enemyLayout = enemyRow.gameObject.AddComponent<HorizontalLayoutGroup>();
+            enemyLayout.spacing = 40;
+            enemyLayout.childAlignment = TextAnchor.MiddleCenter;
+            enemyLayout.childControlWidth = false;
+            enemyLayout.childControlHeight = false;
+
+            var allyRow = CreateRect("AllyRow", shake);
+            SetRect(allyRow, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 30), new Vector2(1180, 300));
+            var allyLayout = allyRow.gameObject.AddComponent<HorizontalLayoutGroup>();
+            allyLayout.spacing = 20;
+            allyLayout.childAlignment = TextAnchor.LowerLeft;
+            allyLayout.childControlWidth = false;
+            allyLayout.childControlHeight = false;
+
+            var enemyTemplate = CreateUnitView("EnemyTemplate", enemyRow, new Vector2(360, 540), enemy: true);
+            var allyTemplate = CreateUnitView("AllyTemplate", allyRow, new Vector2(380, 290), enemy: false);
+
+            // 명령 창 (아래 오른쪽)
+            var panel = CreateImage("CommandPanel", canvas.transform, ColBox, raycast: true);
+            SetRect(panel.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 30), new Vector2(640, 380));
+            var panelAccent = CreateImage("AccentLine", panel.transform, ColAccent);
+            SetRect(panelAccent.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(0, 4));
+            var actor = CreateText("Actor", panel.transform, "행동", 32, ColText, TextAlignmentOptions.Left);
+            actor.fontStyle = FontStyles.Bold;
+            SetRect(actor.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), new Vector2(0, -20), new Vector2(-60, 50));
+            var skillButtons = new Button[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var b = CreateButton("Skill" + (i + 1), panel.transform, "스킬", 26, 0, skew: 14f);
+                int col = i % 2, row = i / 2;
+                SetRect((RectTransform)b.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(30 + col * 295, -84 - row * 82), new Vector2(285, 72));
+                skillButtons[i] = b;
+            }
+            var info = CreateText("SkillInfo", panel.transform, "", 22, ColSubText, TextAlignmentOptions.TopLeft);
+            SetRect(info.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(-60, 90));
+            var back = CreateButton("BackButton", panel.transform, "뒤로", 22, 0);
+            SetRect((RectTransform)back.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-24, -18), new Vector2(110, 46));
+
+            // 정보
+            var round = CreateText("Round", canvas.transform, "ROUND 1", 34, ColText, TextAlignmentOptions.Left);
+            round.fontStyle = FontStyles.Bold;
+            SetRect(round.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -28), new Vector2(400, 50));
+            var logText = CreateText("Log", canvas.transform, "", 22, ColSubText, TextAlignmentOptions.TopLeft);
+            SetRect(logText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -86), new Vector2(520, 220));
+
+            var menuButton = CreateButton("MenuButton", canvas.transform, "메뉴 (Esc)", 24, 0, skew: 14f);
+            SetRect((RectTransform)menuButton.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-28, -22), new Vector2(190, 52));
+            var autoButton = CreateButton("AutoButton", canvas.transform, "자동 전투: 끔", 22, 0, skew: 14f);
+            SetRect((RectTransform)autoButton.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-28, -86), new Vector2(220, 52));
+
+            // 결과
+            var result = CreateImage("ResultPanel", canvas.transform, new Color(0, 0, 0, 0.78f), raycast: true);
+            Stretch(result.rectTransform);
+            var resultText = CreateText("ResultText", result.transform, "승리", 120, ColText, TextAlignmentOptions.Center);
+            resultText.fontStyle = FontStyles.Bold;
+            SetRect(resultText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 80), new Vector2(1000, 180));
+            var resultButton = CreateButton("ResultButton", result.transform, "계속", 34, 0, skew: 22f);
+            SetRect((RectTransform)resultButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -90), new Vector2(360, 84));
+
+            var flash = CreateImage("Flash", canvas.transform, Color.white);
+            Stretch(flash.rectTransform);
+
+            CreatePauseCanvas(menuButton);
+
+            var controller = canvas.gameObject.AddComponent<BattleController>();
+            SetField(controller, "episodesCsv", episodesCsv);
+            SetField(controller, "background", bg);
+            SetField(controller, "shakeRoot", shake);
+            SetField(controller, "enemyRow", enemyRow);
+            SetField(controller, "allyRow", allyRow);
+            SetField(controller, "enemyTemplate", enemyTemplate);
+            SetField(controller, "allyTemplate", allyTemplate);
+            SetField(controller, "flash", flash);
+            SetField(controller, "commandPanel", panel.gameObject);
+            SetField(controller, "actorText", actor);
+            var so = new SerializedObject(controller);
+            var arr = so.FindProperty("skillButtons");
+            arr.arraySize = 4;
+            for (int i = 0; i < 4; i++) arr.GetArrayElementAtIndex(i).objectReferenceValue = skillButtons[i];
+            so.ApplyModifiedPropertiesWithoutUndo();
+            SetField(controller, "skillInfo", info);
+            SetField(controller, "backButton", back);
+            SetField(controller, "autoButton", autoButton);
+            SetField(controller, "roundText", round);
+            SetField(controller, "logText", logText);
+            SetField(controller, "resultPanel", result.gameObject);
+            SetField(controller, "resultText", resultText);
+            SetField(controller, "resultButton", resultButton);
+
+            EditorSceneManager.SaveScene(scene, BattleScenePath);
+            Debug.Log("[Setup] Battle 씬 생성: " + BattleScenePath);
+        }
+
+        /// <summary>전투 유닛 카드. 적은 큰 그림 위주, 아군은 작은 그림과 정보 위주.</summary>
+        static BattleUnitView CreateUnitView(string name, Transform parent, Vector2 size, bool enemy)
+        {
+            // 바탕은 불투명해야 뒤의 Frame이 테두리로만 보인다.
+            var root = CreateImage(name, parent, ColPanel, raycast: true);
+            root.rectTransform.sizeDelta = size;
+            var frame = root.gameObject.AddComponent<Outline>();
+            frame.effectDistance = new Vector2(5, -5);
+            frame.effectColor = Color.clear;
+            var body = CreateRect("Body", root.transform);
+            Stretch(body);
+
+            var portrait = CreateImage("Portrait", body, Color.white);
+            var portraitLabel = CreateText("PortraitLabel", portrait.transform, "", 26, ColSubText, TextAlignmentOptions.Center);
+            Stretch(portraitLabel.rectTransform, 8, 8);
+            var nameText = CreateText("Name", body, "이름", enemy ? 30 : 28, ColText, TextAlignmentOptions.Left);
+            nameText.fontStyle = FontStyles.Bold;
+            var hpBar = CreateImage("HpBar", body, Hex("#2B2F38"));
+            var hpFill = CreateImage("HpFill", hpBar.transform, new Color(0.35f, 0.8f, 0.4f));
+            hpFill.rectTransform.anchorMin = Vector2.zero;
+            hpFill.rectTransform.anchorMax = Vector2.one;
+            hpFill.rectTransform.offsetMin = hpFill.rectTransform.offsetMax = Vector2.zero;
+            var hpText = CreateText("HpText", body, "0 / 0", 22, ColText, TextAlignmentOptions.Right);
+            var infoText = CreateText("Info", body, "", 20, ColSubText, TextAlignmentOptions.TopLeft);
+            var popup = CreateText("Popup", body, "0", 56, Color.white, TextAlignmentOptions.Center);
+            popup.fontStyle = FontStyles.Bold;
+            popup.outlineWidth = 0.25f;
+            popup.outlineColor = new Color32(0, 0, 0, 255);
+
+            if (enemy)
+            {
+                SetRect(portrait.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0.5f, 0.5f), new Vector2(0, 30), new Vector2(-20, -140));
+                SetRect(nameText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 62), new Vector2(-24, 40));
+                SetRect(hpBar.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(-24, 16));
+                SetRect(hpText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 62), new Vector2(-24, 40));
+                SetRect(infoText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 6), new Vector2(-24, 30));
+                SetRect(popup.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 60), new Vector2(300, 90));
+            }
+            else
+            {
+                SetRect(portrait.rectTransform, new Vector2(0, 0), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(10, 0), new Vector2(150, -20));
+                SetRect(nameText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1), new Vector2(172, -14), new Vector2(-184, 40));
+                SetRect(hpBar.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1), new Vector2(172, -66), new Vector2(-190, 18));
+                SetRect(hpText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1), new Vector2(172, -88), new Vector2(-190, 34));
+                SetRect(infoText.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 1), new Vector2(172, -130), new Vector2(-190, -140));
+                SetRect(popup.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 40), new Vector2(300, 90));
+            }
+
+            var view = root.gameObject.AddComponent<BattleUnitView>();
+            SetField(view, "body", body);
+            SetField(view, "portrait", portrait);
+            SetField(view, "portraitLabel", portraitLabel);
+            SetField(view, "nameText", nameText);
+            SetField(view, "hpFill", hpFill.rectTransform);
+            SetField(view, "hpText", hpText);
+            SetField(view, "infoText", infoText);
+            SetField(view, "frame", frame);
+            SetField(view, "popupTemplate", popup);
+            return view;
         }
 
         // ================================================================ Title 씬
@@ -409,7 +684,7 @@ namespace ProjectVita.EditorTools
         static void ApplyBuildScenes()
         {
             // Title, Story를 맨 앞에 두고, 그 밖에 이미 등록된 씬(에피소드 전용 씬 등)은 뒤에 유지한다.
-            var first = new[] { TitleScenePath, StoryScenePath };
+            var first = new[] { TitleScenePath, StoryScenePath, ExplorationScenePath, BattleScenePath };
             var scenes = first.Select(p => new EditorBuildSettingsScene(p, true)).ToList();
             scenes.AddRange(EditorBuildSettings.scenes.Where(s => !first.Contains(s.path)));
             EditorBuildSettings.scenes = scenes.ToArray();

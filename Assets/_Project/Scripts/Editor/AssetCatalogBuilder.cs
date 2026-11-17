@@ -24,11 +24,12 @@ namespace ProjectVita.EditorTools
         public const string BackgroundsDir = "Assets/_Project/Art/Backgrounds";
         public const string CGDir = "Assets/_Project/Art/CG";
         public const string CharactersDir = "Assets/_Project/Art/Characters";
+        public const string BattleArtDir = "Assets/_Project/Art/Battle";
         public const string BgmDir = "Assets/_Project/Audio/BGM";
         public const string SfxDir = "Assets/_Project/Audio/SFX";
         public const string CharactersCsvPath = "Assets/_Project/Data/Characters.csv";
 
-        static readonly string[] WatchedDirs = { BackgroundsDir, CGDir, CharactersDir, BgmDir, SfxDir };
+        static readonly string[] WatchedDirs = { BackgroundsDir, CGDir, CharactersDir, BattleArtDir, BgmDir, SfxDir };
 
         static bool rebuildQueued;
 
@@ -36,7 +37,7 @@ namespace ProjectVita.EditorTools
 
         void OnPreprocessTexture()
         {
-            if (!IsUnder(assetPath, BackgroundsDir, CGDir, CharactersDir)) return;
+            if (!IsUnder(assetPath, BackgroundsDir, CGDir, CharactersDir, BattleArtDir)) return;
             var ti = (TextureImporter)assetImporter;
             ti.textureType = TextureImporterType.Sprite;
             ti.spriteImportMode = SpriteImportMode.Single;
@@ -89,6 +90,7 @@ namespace ProjectVita.EditorTools
             catalog.bgm = CollectAudio(BgmDir, "BGM");
             catalog.sfx = CollectAudio(SfxDir, "효과음");
             catalog.characters = CollectCharacters();
+            catalog.battlePortraits = CollectSprites(BattleArtDir, "전투 그림");
 
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();

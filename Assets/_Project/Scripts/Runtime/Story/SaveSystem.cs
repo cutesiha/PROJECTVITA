@@ -28,6 +28,10 @@ namespace ProjectVita.Story
             public int version = Version;
             public string savedAt;
             public string episodeId;
+            /// <summary>Story(기본) 또는 Exploration</summary>
+            public string scene;
+            /// <summary>탐색 중이면 장소 id</summary>
+            public string location;
             public string node;
             public string bgm;
             public StoryStage.StageState stage;
@@ -40,13 +44,16 @@ namespace ProjectVita.Story
 
         public static bool HasAutoSave => File.Exists(AutoSavePath);
 
-        public static void AutoSave(string episodeId, string node, StoryStage.StageState stage, string bgm)
+        public static void AutoSave(string episodeId, string node, StoryStage.StageState stage, string bgm,
+            string scene = EpisodeFlow.StorySceneName, string location = "")
         {
             var data = new SaveData
             {
                 savedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                 episodeId = episodeId,
-                node = node,
+                scene = scene,
+                location = location ?? string.Empty,
+                node = node ?? string.Empty,
                 bgm = bgm ?? string.Empty,
                 stage = stage,
             };
@@ -72,7 +79,7 @@ namespace ProjectVita.Story
             try
             {
                 var data = JsonUtility.FromJson<SaveData>(File.ReadAllText(AutoSavePath));
-                if (data == null || string.IsNullOrEmpty(data.episodeId) || string.IsNullOrEmpty(data.node))
+                if (data == null || string.IsNullOrEmpty(data.episodeId) || (string.IsNullOrEmpty(data.node) && string.IsNullOrEmpty(data.location)))
                 {
                     Debug.LogWarning("[Save] 자동 저장 파일이 비어 있거나 깨졌다.");
                     return null;

@@ -1,0 +1,6 @@
+﻿status_id,display_name,duration,trigger,effects,stack
+상태이상 id. 영어 숫자 _,화면 표시 이름,기본 지속 턴,효과가 발동하는 때,효과 (Battle_Skill.csv와 같은 문법. 대상은 상태이상에 걸린 유닛),같은 상태이상이 또 걸리면
+영어 숫자 _,자유,정수,turn_start / turn_end / on_hit / on_act,효과 문법,refresh / stack / ignore
+burn,화상,3,turn_end,PercentDamage(6),refresh
+stun,기절,1,on_act,SkipTurn(),ignore
+regen,재생,3,turn_start,Heal(6),refresh

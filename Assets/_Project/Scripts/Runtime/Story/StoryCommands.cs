@@ -92,10 +92,36 @@ namespace ProjectVita.Story
         [YarnCommand("sfx")]
         public static void Sfx(string name, float volume = 1) => AudioManager.Instance.PlaySfx(name, volume);
 
-        // ------------------------------------------------------------ 모드 전환 (TODO(4-5, 4-6))
+        // ------------------------------------------------------------ 모드 전환
 
-        [YarnCommand("explore")] public static void Explore(params string[] args) => LogOnly("explore", args);
-        [YarnCommand("battle")] public static void Battle(params string[] args) => LogOnly("battle", args);
+        /// <summary>&lt;&lt;explore 장소id&gt;&gt;: 탐색 씬의 그 장소로 간다 (Exploration_Location.csv).</summary>
+        [YarnCommand("explore")]
+        public static async YarnTask Explore(string locationId, CancellationToken token)
+        {
+            if (ProjectVita.Exploration.ExplorationData.Instance.FindLocation(locationId) == null)
+            {
+                Debug.LogError($"[명령] <<explore {locationId}>>: Exploration_Location.csv에 없는 장소다.");
+                DevOverlay.SetStatus($"<<explore {locationId}>> 실패: 없는 장소");
+                return;
+            }
+            if (!EpisodeFlow.GoExplore(locationId)) return;
+            await YarnTask.WaitUntilCanceled(token);
+        }
+
+        /// <summary>&lt;&lt;battle 조우id&gt;&gt;: 전투로 간다 (Battle_Encounter.csv). 끝나면 승리/패배 노드로 돌아온다.</summary>
+        [YarnCommand("battle")]
+        public static async YarnTask Battle(string encounterId, CancellationToken token)
+        {
+            if (ProjectVita.Battle.BattleDatabase.Instance.Encounter(encounterId) == null)
+            {
+                Debug.LogError($"[명령] <<battle {encounterId}>>: Battle_Encounter.csv에 없는 조우다.");
+                DevOverlay.SetStatus($"<<battle {encounterId}>> 실패: 없는 조우");
+                return;
+            }
+            string location = ProjectVita.Exploration.ExplorationController.Current?.LocationId;
+            if (!EpisodeFlow.StartBattle(encounterId, location)) return;
+            await YarnTask.WaitUntilCanceled(token);
+        }
 
         // ------------------------------------------------------------ 에피소드 이동
 
@@ -112,6 +138,14 @@ namespace ProjectVita.Story
                 DevOverlay.SetStatus($"<<episode {episodeId}>> 실패. Console 확인");
                 return; // 이동에 실패하면 대사를 계속 진행한다.
             }
+            await YarnTask.WaitUntilCanceled(token);
+        }
+
+        /// <summary>&lt;&lt;title&gt;&gt;: 타이틀로 돌아간다 (데모의 끝, 게임 오버 등).</summary>
+        [YarnCommand("title")]
+        public static async YarnTask Title(CancellationToken token)
+        {
+            EpisodeFlow.GoTitle();
             await YarnTask.WaitUntilCanceled(token);
         }
 
@@ -143,11 +177,6 @@ namespace ProjectVita.Story
             var stage = StoryStage.Current;
             if (stage == null) Debug.LogWarning($"[명령] <<{command}>>: 이 씬에 StoryStage가 없다.");
             return stage;
-        }
-
-        static void LogOnly(string name, string[] args)
-        {
-            Debug.Log($"[명령] <<{name}{(args.Length > 0 ? " " + string.Join(" ", args) : "")}>>  (아직 로그만 찍는 빈 구현)");
         }
     }
 }

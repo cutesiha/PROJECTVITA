@@ -1,0 +1,109 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a96226f52da3bc94bb2c9d7b11ddd0c5, type: 3}
+  m_Name: ExplorationData
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectVita.Exploration.ExplorationData
+  locations:
+  - id: ruins_entrance
+    displayName: "\uD3D0\uD5C8 \uC785\uAD6C"
+    background: ruins_night
+    enterNode: ExploreExample_Entrance
+    unlockIf: 
+  - id: corridor
+    displayName: "\uBCF5\uB3C4"
+    background: corridor
+    enterNode: 
+    unlockIf: $ruins_entrance_visited
+  - id: lab
+    displayName: "\uC5F0\uAD6C\uC2E4"
+    background: lab
+    enterNode: ExploreExample_LabEnter
+    unlockIf: $keycard_seen
+  objects:
+  - id: rubble
+    locationId: ruins_entrance
+    displayName: "\uBB34\uB108\uC9C4 \uC794\uD574"
+    node: ExploreExample_Rubble
+    showIf: 
+    once: 0
+    area:
+      serializedVersion: 2
+      x: 250
+      y: 560
+      width: 460
+      height: 240
+    encounterId: 
+  - id: stranger
+    locationId: ruins_entrance
+    displayName: "\uB0AF\uC120 \uC0AC\uB78C"
+    node: ExploreExample_Stranger
+    showIf: 
+    once: 0
+    area:
+      serializedVersion: 2
+      x: 1240
+      y: 220
+      width: 320
+      height: 600
+    encounterId: 
+  - id: keycard
+    locationId: corridor
+    displayName: "\uB5A8\uC5B4\uC9C4 \uCE74\uB4DC"
+    node: ExploreExample_Keycard
+    showIf: 
+    once: 1
+    area:
+      serializedVersion: 2
+      x: 880
+      y: 700
+      width: 200
+      height: 120
+    encounterId: 
+  - id: note
+    locationId: corridor
+    displayName: "\uBCBD\uC758 \uBA54\uBAA8"
+    node: ExploreExample_Note
+    showIf: $keycard_seen
+    once: 0
+    area:
+      serializedVersion: 2
+      x: 380
+      y: 260
+      width: 280
+      height: 220
+    encounterId: 
+  - id: guard
+    locationId: lab
+    displayName: "\uACBD\uBE44 \uC778\uC870 \uC0DD\uBB3C"
+    node: ExploreExample_Guard
+    showIf: not $guard_defeated
+    once: 0
+    area:
+      serializedVersion: 2
+      x: 780
+      y: 200
+      width: 380
+      height: 560
+    encounterId: Lab_Guard
+  - id: exit_door
+    locationId: lab
+    displayName: "\uCD9C\uAD6C"
+    node: ExploreExample_Exit
+    showIf: $guard_defeated
+    once: 0
+    area:
+      serializedVersion: 2
+      x: 1480
+      y: 240
+      width: 300
+      height: 520
+    encounterId: 

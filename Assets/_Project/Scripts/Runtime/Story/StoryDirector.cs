@@ -57,6 +57,14 @@ namespace ProjectVita.Story
                 Debug.Log($"[Story] 이어하기: {episode.Id} / {startNode} (저장 {resume.savedAt})");
             }
 
+            // 전투에서 돌아왔으면 승리/패배 노드부터 시작한다.
+            string pendingNode = EpisodeFlow.TakePendingNode();
+            if (!string.IsNullOrEmpty(pendingNode))
+            {
+                if (HasNode(pendingNode)) startNode = pendingNode;
+                else Fail($"전투 결과 노드 '{pendingNode}'가 Yarn에 없다 (Battle_Encounter.csv 확인).");
+            }
+
             // 변수는 씬 밖 저장소에 둔다. Dialogue가 처음 만들어지기(RunDialogue) 전에 바꿔야 한다.
             var storage = GameVariables.Storage;
             storage.Program = runner.YarnProject.Program;

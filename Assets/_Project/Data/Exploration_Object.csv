@@ -1,0 +1,9 @@
+﻿object_id,location_id,display_name,node,show_if,once,area,encounter_id
+오브젝트나 인물 id. 영어 숫자 _,있는 장소,마우스를 올리면 보이는 이름,클릭하면 실행할 Yarn 노드,보이는 조건 (Yarn식). 비우면 항상,한 번 조사하면 사라짐,클릭 영역: x y 너비 높이 (1920x1080 왼쪽 위 기준 픽셀),대사가 끝난 뒤 시작할 전투 (Battle_Encounter.csv)
+영어 숫자 _,location_id,자유,Yarn 노드 이름 또는 빈칸,예: $keycard_seen / not $guard_defeated,true 또는 false,예: 300 520 420 260,encounter_id 또는 빈칸
+rubble,ruins_entrance,무너진 잔해,ExploreExample_Rubble,,false,250 560 460 240,
+stranger,ruins_entrance,낯선 사람,ExploreExample_Stranger,,false,1240 220 320 600,
+keycard,corridor,떨어진 카드,ExploreExample_Keycard,,true,880 700 200 120,
+note,corridor,벽의 메모,ExploreExample_Note,$keycard_seen,false,380 260 280 220,
+guard,lab,경비 인조 생물,ExploreExample_Guard,not $guard_defeated,false,780 200 380 560,Lab_Guard
+exit_door,lab,출구,ExploreExample_Exit,$guard_defeated,false,1480 240 300 520,

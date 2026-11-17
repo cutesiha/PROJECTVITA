@@ -4,3 +4,5 @@
 Prologue,프롤로그,,Prologue_Start,Ch1_01
 Ch1_01,챕터 1-1,,Ch1_01_Start,
 Example,[예시] 문법 확인,,Example_Start,
+ExploreTest,[예시] 탐색 확인,Exploration,ExploreExample_Start,
+BattleTest,[예시] 전투 확인,,BattleTest_Start,

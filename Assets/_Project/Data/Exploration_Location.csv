@@ -1,0 +1,6 @@
+﻿location_id,display_name,background,enter_node,unlock_if
+장소 id. 영어 숫자 _,지도와 화면에 보이는 이름,배경 이름 (Art/Backgrounds 파일 이름),처음 들어갈 때 한 번 실행할 Yarn 노드. 비우면 없음,지도에 나타나는 조건 (Yarn식). 비우면 항상
+영어 숫자 _,자유,배경 이름,Yarn 노드 이름 또는 빈칸,예: $key_seen / not $door_open / $day >= 2
+ruins_entrance,폐허 입구,ruins_night,ExploreExample_Entrance,
+corridor,복도,corridor,,$ruins_entrance_visited
+lab,연구실,lab,ExploreExample_LabEnter,$keycard_seen

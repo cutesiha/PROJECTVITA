@@ -1,0 +1,15 @@
+title: Generated_Exploration
+---
+// 자동 생성 파일이다. 고치지 않는다. (CSV 임포트가 Exploration CSV에서 만든다)
+// 탐색에서 자동으로 켜지는 변수: $오브젝트id_seen (조사함), $장소id_visited (들어가 봄)
+// 같은 변수를 다른 .yarn에서 또 <<declare>>하면 중복 선언 오류가 난다.
+<<declare $ruins_entrance_visited = false>>
+<<declare $corridor_visited = false>>
+<<declare $lab_visited = false>>
+<<declare $rubble_seen = false>>
+<<declare $stranger_seen = false>>
+<<declare $keycard_seen = false>>
+<<declare $note_seen = false>>
+<<declare $guard_seen = false>>
+<<declare $exit_door_seen = false>>
+===

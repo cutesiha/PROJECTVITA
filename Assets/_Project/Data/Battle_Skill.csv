@@ -1,0 +1,15 @@
+﻿skill_id,display_name,description,type,power,accuracy,cost_kind,cost_value,target,effects
+스킬 id. 영어 숫자 _,화면 표시 이름,설명,타입 (비우면 무속성),위력 (Damage(power)에 쓰임),명중률 0~100,비용 종류 (게이지 id. 비우면 없음),비용,대상,효과 (아래 문법)
+영어 숫자 _,자유,자유,타입 이름 또는 빈칸,정수,정수,sp 또는 빈칸,정수,single_enemy / all_enemy / self / single_ally / all_ally,Damage(power) FixedDamage(n) PercentDamage(n%) Heal(n%) ApplyStatus(id 턴 확률%) RemoveStatus(id) ModifyStat(stat 단계) ChangeGauge(id 양) SkipTurn() 를 ; 로 잇는다. 앞에 self: 를 붙이면 사용자에게
+Strike,강타,기본 공격,,40,100,,0,single_enemy,Damage(power)
+Quick_Jab,빠른 찌르기,약하지만 빗나가지 않는다,,30,100,,0,single_enemy,Damage(power)
+Flame_Slash,불꽃 베기,30% 확률로 화상,red,70,90,sp,8,single_enemy,"Damage(power); ApplyStatus(burn,3,30%)"
+Guard_Up,방어 태세,자신의 방어 1단계 상승,,0,100,sp,5,self,"ModifyStat(def,1)"
+Tide_Pierce,물살 찌르기,강한 단일 공격,blue,75,90,sp,8,single_enemy,Damage(power)
+Stun_Blow,기절 타격,50% 확률로 1턴 기절,,30,85,sp,10,single_enemy,"Damage(power); ApplyStatus(stun,1,50%)"
+Thorn_Burst,가시 폭발,적 전체 공격,green,45,95,sp,12,all_enemy,Damage(power)
+Mend,치료,아군 하나를 최대 체력의 35% 회복,,35,100,sp,10,single_ally,Heal(power)
+Regen_Field,재생의 장,아군 전체에 3턴 재생,,0,100,sp,14,all_ally,"ApplyStatus(regen,3)"
+Claw,할퀴기,기본 공격,,45,95,,0,single_enemy,Damage(power)
+Ember_Bite,불씨 물기,40% 확률로 화상,red,55,90,,0,single_enemy,"Damage(power); ApplyStatus(burn,3,40%)"
+Tidal_Crush,해일 짓누르기,아군 전체 공격,blue,40,90,,0,all_enemy,Damage(power)

@@ -69,6 +69,16 @@ namespace ProjectVita.Core
         public List<AudioEntry> bgm = new List<AudioEntry>();
         public List<AudioEntry> sfx = new List<AudioEntry>();
         public List<CharacterEntry> characters = new List<CharacterEntry>();
+        /// <summary>전투 전용 그림 (Art/Battle/{portrait_id}.png). 없으면 대화 스탠딩을 쓴다.</summary>
+        public List<SpriteEntry> battlePortraits = new List<SpriteEntry>();
+
+        /// <summary>전투 그림: Art/Battle에 있으면 그것, 없으면 같은 id 캐릭터의 기본 표정.</summary>
+        public Sprite FindBattlePortrait(string id)
+        {
+            var sprite = FindIn(battlePortraits, id)?.sprite;
+            if (sprite != null) return sprite;
+            return FindCharacter(id)?.GetExpression(CharacterEntry.DefaultExpression, out _);
+        }
 
         // ------------------------------------------------------------ 찾기
 

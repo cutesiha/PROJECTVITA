@@ -37,6 +37,17 @@ namespace ProjectVita.EditorTools
             ("Stranger", "???", "#3E4470", new[] { "default" }),
         };
 
+        // 전투 더미 유닛 (Art/Battle/{id}.png). 세계관 고유명사를 쓰지 않는다.
+        static readonly (string id, string label, string color)[] BattleUnits =
+        {
+            ("Ally_A", "아군 A", "#8E2A24"),
+            ("Ally_B", "아군 B", "#2A5A8E"),
+            ("Ally_C", "아군 C", "#2E7D4F"),
+            ("Enemy_Construct_1", "인조 생물 1", "#4F6B2E"),
+            ("Enemy_Construct_2", "인조 생물 2", "#7A3B22"),
+            ("Enemy_Construct_3", "인조 생물 3", "#2F3F6E"),
+        };
+
         // ------------------------------------------------------------ 메뉴
 
         [MenuItem(MenuRoot + "임시 그림과 소리 만들기", priority = 13)]
@@ -69,6 +80,10 @@ namespace ProjectVita.EditorTools
                         () => MakeStanding(font, Hex(color) * shade, label, expr));
                 }
             }
+
+            foreach (var (id, label, color) in BattleUnits)
+                Make($"{AssetCatalogBuilder.BattleArtDir}/{id}.png", ref made, ref skipped,
+                    () => MakeFigure(font, 500, 700, Hex(color), label, id, id.StartsWith("Enemy")));
 
             MakeWav($"{AssetCatalogBuilder.BgmDir}/calm_ominous.wav", ref made, ref skipped, Drone);
             MakeWav($"{AssetCatalogBuilder.BgmDir}/tension.wav", ref made, ref skipped, Pulse);
@@ -128,8 +143,33 @@ namespace ProjectVita.EditorTools
             FillRect(px, w, h, 60, 560, 540, 760, color);
             FillRect(px, w, h, 190, 780, 410, 1080, color * 1.1f);
             var white = new Color(1f, 1f, 1f, 0.95f);
-            DrawText(px, w, h, font, label, 72f, new Vector2(w / 2f, 520f), white);
-            DrawText(px, w, h, font, expression, 52f, new Vector2(w / 2f, 400f), white);
+            // 대사창에 가려지지 않게 어깨 높이에 쓴다.
+            DrawText(px, w, h, font, label, 72f, new Vector2(w / 2f, 690f), white);
+            DrawText(px, w, h, font, expression, 52f, new Vector2(w / 2f, 605f), white);
+            return ToTexture(px, w, h);
+        }
+
+        /// <summary>전투용 그림. 적은 넓적한 덩어리, 아군은 사람 실루엣.</summary>
+        static Texture2D MakeFigure(TMP_FontAsset font, int w, int h, Color color, string label, string id, bool enemy)
+        {
+            var px = new Color32[w * h];
+            color.a = 1f;
+            if (enemy)
+            {
+                FillRect(px, w, h, 40, 60, 460, 420, color);
+                FillRect(px, w, h, 90, 420, 410, 560, color * 1.15f);
+                FillRect(px, w, h, 150, 560, 230, 640, color * 1.3f);
+                FillRect(px, w, h, 270, 560, 350, 640, color * 1.3f);
+            }
+            else
+            {
+                FillRect(px, w, h, 90, 0, 410, 430, color);
+                FillRect(px, w, h, 60, 330, 440, 450, color);
+                FillRect(px, w, h, 160, 470, 340, 680, color * 1.1f);
+            }
+            var white = new Color(1f, 1f, 1f, 0.95f);
+            DrawText(px, w, h, font, label, 56f, new Vector2(w / 2f, 300f), white);
+            DrawText(px, w, h, font, id, 30f, new Vector2(w / 2f, 236f), white);
             return ToTexture(px, w, h);
         }
 

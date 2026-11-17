@@ -1,0 +1,86 @@
+// ─────────────────────────────────────────────
+// 탐색 예시 (에피소드 ExploreTest). 장소와 오브젝트는 Data/Exploration_*.csv에 있다.
+// 오브젝트를 클릭하면 그 줄의 node가 실행되고, 대사가 끝나면 탐색으로 돌아온다.
+// $오브젝트id_seen, $장소id_visited 는 자동으로 켜진다 (선언은 _Generated/Exploration.yarn).
+// ─────────────────────────────────────────────
+
+title: ExploreExample_Start
+---
+<<declare $guard_defeated = false>>
+<<bgm calm_ominous 1>>
+탐색 예시다. 지도에서 장소를 고르고, 화면의 물건이나 사람을 클릭해 본다.
+처음에는 폐허 입구만 갈 수 있다. 한 번 들어가면 복도가 열린다.
+===
+
+title: ExploreExample_Entrance
+---
+// 장소에 처음 들어갈 때 한 번만 실행된다 (enter_node).
+무너진 건물 입구다. 어딘가에서 바람 소리가 난다.
+===
+
+title: ExploreExample_Rubble
+---
+<<if $rubble_seen>>
+    이미 살펴본 잔해다. 더 나올 것은 없다.
+<<else>>
+    잔해 사이를 뒤졌다. 녹슨 금속 조각뿐이다.
+<<endif>>
+===
+
+title: ExploreExample_Stranger
+---
+<<show ??? default center>>
+???: 여기서 뭘 찾는 거지?
+-> 길을 묻는다
+    ???: 안쪽 복도로 가 봐. 카드가 떨어져 있을 거야.
+-> 아무 말도 하지 않는다
+    ???: ...
+===
+
+title: ExploreExample_Keycard
+---
+<<sfx impact 0.5>>
+바닥에서 출입 카드를 주웠다.
+지도에 연구실이 나타났다. 벽에 메모도 보인다.
+===
+
+title: ExploreExample_Note
+---
+메모에는 이렇게 적혀 있다\: 연구실의 경비를 조심할 것.
+===
+
+title: ExploreExample_LabEnter
+---
+<<vignette 0.5>>
+차가운 공기. 무언가가 움직인다.
+<<vignette off>>
+===
+
+title: ExploreExample_Guard
+---
+<<shake 0.6 0.4>>
+경비 인조 생물이 길을 막는다. 대사가 끝나면 전투가 시작된다.
+// Exploration_Object.csv의 encounter_id(Lab_Guard)로 전투에 들어간다.
+===
+
+title: ExploreExample_GuardWin
+---
+// Battle_Encounter.csv의 win_node. 전투가 끝나면 탐색(연구실)으로 돌아와 이 노드가 먼저 실행된다.
+<<set $guard_defeated to true>>
+경비를 쓰러뜨렸다. 출구가 보인다.
+===
+
+title: ExploreExample_GuardLose
+---
+// lose_rule이 continue라서 지면 이 노드가 실행되고 탐색으로 돌아온다.
+물러날 수밖에 없었다. 다시 도전할 수 있다.
+===
+
+title: ExploreExample_Exit
+---
+출구 앞에 섰다.
+-> 나간다 (타이틀로)
+    탐색 예시가 끝났다.
+    <<title>>
+-> 조금 더 둘러본다
+===

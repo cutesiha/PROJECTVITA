@@ -1,0 +1,5 @@
+﻿encounter_id,enemies,allies,background,bgm,win_node,lose_node,lose_rule
+조우 id. 영어 숫자 _,적 unit_id 목록 (띄어쓰기로 구분),출전 아군 (비우면 아군 앞에서부터 3명),배경 이름,BGM 이름,이기면 실행할 Yarn 노드,지면 실행할 Yarn 노드,지면 어떻게 할지
+영어 숫자 _,unit_id unit_id ...,unit_id ... 또는 빈칸,배경 이름 또는 빈칸,BGM 이름 또는 빈칸,Yarn 노드,Yarn 노드,gameover / retry / continue
+Tutorial_01,Enemy_Construct_1 Enemy_Construct_2,,ruins_night,tension,BattleTest_Win,BattleTest_Lose,retry
+Lab_Guard,Enemy_Construct_3,,lab,tension,ExploreExample_GuardWin,ExploreExample_GuardLose,continue

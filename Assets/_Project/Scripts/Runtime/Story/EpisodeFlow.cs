@@ -14,6 +14,16 @@ namespace ProjectVita.Story
     {
         public const string TitleSceneName = "Title";
         public const string StorySceneName = "Story";
+        public const string ExplorationSceneName = "Exploration";
+        public const string BattleSceneName = "Battle";
+
+        // 다음 씬이 한 번 꺼내 쓰는 값들
+        static string pendingNode;       // 시작 노드 대신 실행할 노드 (전투 결과 노드 등)
+        static string pendingLocation;   // 탐색 씬에서 들어갈 장소
+        static string pendingEncounter;  // 전투 씬에서 시작할 조우
+        static string battleReturnScene; // 전투가 끝나면 돌아갈 씬
+        static string battleReturnLocation;
+        static string battleReturnBgm;     // 전투가 끝나면 다시 틀 BGM
 
         public static EpisodeTable Table { get; private set; }
 
@@ -34,6 +44,7 @@ namespace ProjectVita.Story
             Current = null;
             IsLoading = false;
             pendingResume = null;
+            pendingNode = pendingLocation = pendingEncounter = battleReturnScene = battleReturnLocation = null;
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SceneManager.sceneLoaded += OnSceneLoaded;
         }
@@ -61,16 +72,18 @@ namespace ProjectVita.Story
             if (IsLoading) return false;
             GameVariables.Clear();
             pendingResume = null;
+            pendingNode = pendingLocation = pendingEncounter = null;
             return TryGo(episodeId);
         }
 
-        /// <summary>자동 저장에서 이어한다. 변수를 되돌리고, 저장한 노드부터 시작한다.</summary>
+        /// <summary>자동 저장에서 이어한다. 변수를 되돌리고, 저장한 곳(이야기 노드 또는 탐색 장소)부터 시작한다.</summary>
         public static bool Continue()
         {
             if (IsLoading) return false;
             var data = SaveSystem.LoadAutoSave();
             if (data == null) return false;
-            if (Table?.Find(data.episodeId) == null)
+            var episode = Table?.Find(data.episodeId);
+            if (episode == null)
             {
                 Debug.LogError($"[Episode] 세이브의 에피소드 '{data.episodeId}'가 Episodes.csv에 없다.");
                 return false;
@@ -78,7 +91,61 @@ namespace ProjectVita.Story
             GameVariables.Clear();
             SaveSystem.RestoreVariables(data);
             pendingResume = data;
+
+            if (data.scene == ExplorationSceneName)
+            {
+                pendingLocation = data.location;
+                if (!LoadScene(ExplorationSceneName)) return false;
+                Current = episode;
+                return true;
+            }
             return TryGo(data.episodeId);
+        }
+
+        // ------------------------------------------------------------ 탐색, 전투
+
+        /// <summary>&lt;&lt;explore 장소&gt;&gt;: 탐색 씬의 그 장소로 간다. 에피소드는 그대로다.</summary>
+        public static bool GoExplore(string locationId)
+        {
+            if (IsLoading) return false;
+            pendingLocation = locationId;
+            pendingResume = null;
+            return LoadScene(ExplorationSceneName);
+        }
+
+        /// <summary>&lt;&lt;battle 조우&gt;&gt;: 전투 씬으로 간다. 끝나면 지금 씬(이야기 또는 탐색 장소)으로 돌아와 결과 노드를 실행한다.</summary>
+        public static bool StartBattle(string encounterId, string returnLocation)
+        {
+            if (IsLoading) return false;
+            battleReturnScene = SceneManager.GetActiveScene().name;
+            battleReturnLocation = returnLocation;
+            battleReturnBgm = AudioManager.Instance.CurrentBgm;
+            pendingEncounter = encounterId;
+            pendingResume = null;
+            return LoadScene(BattleSceneName);
+        }
+
+        /// <summary>전투가 끝났다. 시작한 씬으로 돌아가서 resultNode(승리/패배 노드)를 실행한다.</summary>
+        public static void EndBattle(string resultNode)
+        {
+            string scene = string.IsNullOrEmpty(battleReturnScene) || battleReturnScene == BattleSceneName
+                ? (Current?.SceneName ?? StorySceneName)
+                : battleReturnScene;
+            pendingNode = resultNode;
+            if (scene == ExplorationSceneName) pendingLocation = battleReturnLocation;
+            AudioManager.Instance.PlayBgm(battleReturnBgm, 1f); // 전투 전 BGM으로 (없었으면 끈다)
+            LoadScene(scene);
+        }
+
+        public static string TakePendingNode() => Take(ref pendingNode);
+        public static string TakePendingLocation() => Take(ref pendingLocation);
+        public static string TakePendingEncounter() => Take(ref pendingEncounter);
+
+        static string Take(ref string field)
+        {
+            var v = field;
+            field = null;
+            return v;
         }
 
         /// <summary>이 에피소드를 이어하기로 시작해야 하면 세이브를 돌려준다 (한 번만).</summary>
@@ -107,6 +174,8 @@ namespace ProjectVita.Story
 
             if (!LoadScene(episode.SceneName)) return false;
             Current = episode;
+            pendingNode = null;
+            pendingLocation = null;
             Debug.Log($"[Episode] → {episode} / 씬 {episode.SceneName} / 시작 노드 {episode.StartNode}");
             return true;
         }

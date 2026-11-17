@@ -1,0 +1,429 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 042d00cde2fa1124d9d13d2c6801f05c, type: 3}
+  m_Name: BattleDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectVita.Battle.BattleDatabase
+  stats:
+  - id: hp
+    displayName: "\uCCB4\uB825"
+    description: "0\uC774 \uB418\uBA74 \uC4F0\uB7EC\uC9C4\uB2E4"
+    min: 1
+    max: 9999
+  - id: atk
+    displayName: "\uACF5\uACA9"
+    description: "\uB370\uBBF8\uC9C0 \uACF5\uC2DD\uC758 \uACF5\uACA9 \uCABD \uAC12"
+    min: 1
+    max: 999
+  - id: def
+    displayName: "\uBC29\uC5B4"
+    description: "\uB370\uBBF8\uC9C0 \uACF5\uC2DD\uC758 \uBC29\uC5B4 \uCABD \uAC12"
+    min: 1
+    max: 999
+  - id: spd
+    displayName: "\uC18D\uB3C4"
+    description: "\uB192\uC744\uC218\uB85D \uBA3C\uC800 \uD589\uB3D9\uD55C\uB2E4"
+    min: 1
+    max: 999
+  - id: sp
+    displayName: "\uAE30\uB825"
+    description: "\uC2A4\uD0AC \uBE44\uC6A9 (cost_kind\uAC00 sp\uC778 \uC2A4\uD0AC)"
+    min: 0
+    max: 999
+  units:
+  - id: Ally_A
+    displayName: "\uC544\uAD70 A"
+    side: 0
+    type: red
+    stats:
+    - stat: hp
+      value: 120
+    - stat: atk
+      value: 60
+    - stat: def
+      value: 55
+    - stat: spd
+      value: 50
+    - stat: sp
+      value: 30
+    skills:
+    - Strike
+    - Flame_Slash
+    - Guard_Up
+    - Quick_Jab
+    passive: 
+    portraitId: Ally_A
+  - id: Ally_B
+    displayName: "\uC544\uAD70 B"
+    side: 0
+    type: blue
+    stats:
+    - stat: hp
+      value: 95
+    - stat: atk
+      value: 72
+    - stat: def
+      value: 40
+    - stat: spd
+      value: 75
+    - stat: sp
+      value: 30
+    skills:
+    - Quick_Jab
+    - Tide_Pierce
+    - Stun_Blow
+    - Strike
+    passive: 
+    portraitId: Ally_B
+  - id: Ally_C
+    displayName: "\uC544\uAD70 C"
+    side: 0
+    type: green
+    stats:
+    - stat: hp
+      value: 105
+    - stat: atk
+      value: 45
+    - stat: def
+      value: 50
+    - stat: spd
+      value: 55
+    - stat: sp
+      value: 40
+    skills:
+    - Strike
+    - Thorn_Burst
+    - Mend
+    - Regen_Field
+    passive: 
+    portraitId: Ally_C
+  - id: Enemy_Construct_1
+    displayName: "\uC778\uC870 \uC0DD\uBB3C 1"
+    side: 1
+    type: green
+    stats:
+    - stat: hp
+      value: 170
+    - stat: atk
+      value: 72
+    - stat: def
+      value: 62
+    - stat: spd
+      value: 48
+    - stat: sp
+      value: 20
+    skills:
+    - Claw
+    - Stun_Blow
+    passive: 
+    portraitId: Enemy_Construct_1
+  - id: Enemy_Construct_2
+    displayName: "\uC778\uC870 \uC0DD\uBB3C 2"
+    side: 1
+    type: red
+    stats:
+    - stat: hp
+      value: 140
+    - stat: atk
+      value: 82
+    - stat: def
+      value: 48
+    - stat: spd
+      value: 70
+    - stat: sp
+      value: 0
+    skills:
+    - Claw
+    - Ember_Bite
+    passive: 
+    portraitId: Enemy_Construct_2
+  - id: Enemy_Construct_3
+    displayName: "\uC778\uC870 \uC0DD\uBB3C 3"
+    side: 1
+    type: blue
+    stats:
+    - stat: hp
+      value: 330
+    - stat: atk
+      value: 80
+    - stat: def
+      value: 72
+    - stat: spd
+      value: 40
+    - stat: sp
+      value: 0
+    skills:
+    - Claw
+    - Tidal_Crush
+    passive: 
+    portraitId: Enemy_Construct_3
+  skills:
+  - id: Strike
+    displayName: "\uAC15\uD0C0"
+    description: "\uAE30\uBCF8 \uACF5\uACA9"
+    type: 
+    power: 40
+    accuracy: 100
+    costKind: 
+    costValue: 0
+    target: 0
+    effectsText: Damage(power)
+    effects:
+    - name: Damage
+      args:
+      - power
+  - id: Quick_Jab
+    displayName: "\uBE60\uB978 \uCC0C\uB974\uAE30"
+    description: "\uC57D\uD558\uC9C0\uB9CC \uBE57\uB098\uAC00\uC9C0 \uC54A\uB294\uB2E4"
+    type: 
+    power: 30
+    accuracy: 100
+    costKind: 
+    costValue: 0
+    target: 0
+    effectsText: Damage(power)
+    effects:
+    - name: Damage
+      args:
+      - power
+  - id: Flame_Slash
+    displayName: "\uBD88\uAF43 \uBCA0\uAE30"
+    description: "30% \uD655\uB960\uB85C \uD654\uC0C1"
+    type: red
+    power: 70
+    accuracy: 90
+    costKind: sp
+    costValue: 8
+    target: 0
+    effectsText: Damage(power); ApplyStatus(burn,3,30%)
+    effects:
+    - name: Damage
+      args:
+      - power
+    - name: ApplyStatus
+      args:
+      - burn
+      - 3
+      - 30%
+  - id: Guard_Up
+    displayName: "\uBC29\uC5B4 \uD0DC\uC138"
+    description: "\uC790\uC2E0\uC758 \uBC29\uC5B4 1\uB2E8\uACC4 \uC0C1\uC2B9"
+    type: 
+    power: 0
+    accuracy: 100
+    costKind: sp
+    costValue: 5
+    target: 2
+    effectsText: ModifyStat(def,1)
+    effects:
+    - name: ModifyStat
+      args:
+      - def
+      - 1
+  - id: Tide_Pierce
+    displayName: "\uBB3C\uC0B4 \uCC0C\uB974\uAE30"
+    description: "\uAC15\uD55C \uB2E8\uC77C \uACF5\uACA9"
+    type: blue
+    power: 75
+    accuracy: 90
+    costKind: sp
+    costValue: 8
+    target: 0
+    effectsText: Damage(power)
+    effects:
+    - name: Damage
+      args:
+      - power
+  - id: Stun_Blow
+    displayName: "\uAE30\uC808 \uD0C0\uACA9"
+    description: "50% \uD655\uB960\uB85C 1\uD134 \uAE30\uC808"
+    type: 
+    power: 30
+    accuracy: 85
+    costKind: sp
+    costValue: 10
+    target: 0
+    effectsText: Damage(power); ApplyStatus(stun,1,50%)
+    effects:
+    - name: Damage
+      args:
+      - power
+    - name: ApplyStatus
+      args:
+      - stun
+      - 1
+      - 50%
+  - id: Thorn_Burst
+    displayName: "\uAC00\uC2DC \uD3ED\uBC1C"
+    description: "\uC801 \uC804\uCCB4 \uACF5\uACA9"
+    type: green
+    power: 45
+    accuracy: 95
+    costKind: sp
+    costValue: 12
+    target: 1
+    effectsText: Damage(power)
+    effects:
+    - name: Damage
+      args:
+      - power
+  - id: Mend
+    displayName: "\uCE58\uB8CC"
+    description: "\uC544\uAD70 \uD558\uB098\uB97C \uCD5C\uB300 \uCCB4\uB825\uC758
+      35% \uD68C\uBCF5"
+    type: 
+    power: 35
+    accuracy: 100
+    costKind: sp
+    costValue: 10
+    target: 3
+    effectsText: Heal(power)
+    effects:
+    - name: Heal
+      args:
+      - power
+  - id: Regen_Field
+    displayName: "\uC7AC\uC0DD\uC758 \uC7A5"
+    description: "\uC544\uAD70 \uC804\uCCB4\uC5D0 3\uD134 \uC7AC\uC0DD"
+    type: 
+    power: 0
+    accuracy: 100
+    costKind: sp
+    costValue: 14
+    target: 4
+    effectsText: ApplyStatus(regen,3)
+    effects:
+    - name: ApplyStatus
+      args:
+      - regen
+      - 3
+  - id: Claw
+    displayName: "\uD560\uD034\uAE30"
+    description: "\uAE30\uBCF8 \uACF5\uACA9"
+    type: 
+    power: 45
+    accuracy: 95
+    costKind: 
+    costValue: 0
+    target: 0
+    effectsText: Damage(power)
+    effects:
+    - name: Damage
+      args:
+      - power
+  - id: Ember_Bite
+    displayName: "\uBD88\uC528 \uBB3C\uAE30"
+    description: "40% \uD655\uB960\uB85C \uD654\uC0C1"
+    type: red
+    power: 55
+    accuracy: 90
+    costKind: 
+    costValue: 0
+    target: 0
+    effectsText: Damage(power); ApplyStatus(burn,3,40%)
+    effects:
+    - name: Damage
+      args:
+      - power
+    - name: ApplyStatus
+      args:
+      - burn
+      - 3
+      - 40%
+  - id: Tidal_Crush
+    displayName: "\uD574\uC77C \uC9D3\uB204\uB974\uAE30"
+    description: "\uC544\uAD70 \uC804\uCCB4 \uACF5\uACA9"
+    type: blue
+    power: 40
+    accuracy: 90
+    costKind: 
+    costValue: 0
+    target: 1
+    effectsText: Damage(power)
+    effects:
+    - name: Damage
+      args:
+      - power
+  statuses:
+  - id: burn
+    displayName: "\uD654\uC0C1"
+    duration: 3
+    trigger: 1
+    effectsText: PercentDamage(6)
+    effects:
+    - name: PercentDamage
+      args:
+      - 6
+    stack: 0
+  - id: stun
+    displayName: "\uAE30\uC808"
+    duration: 1
+    trigger: 3
+    effectsText: SkipTurn()
+    effects:
+    - name: SkipTurn
+      args: []
+    stack: 2
+  - id: regen
+    displayName: "\uC7AC\uC0DD"
+    duration: 3
+    trigger: 0
+    effectsText: Heal(6)
+    effects:
+    - name: Heal
+      args:
+      - 6
+    stack: 0
+  typeChart:
+  - attackType: red
+    multipliersPercent:
+    - stat: red
+      value: 100
+    - stat: blue
+      value: 50
+    - stat: green
+      value: 200
+  - attackType: blue
+    multipliersPercent:
+    - stat: red
+      value: 200
+    - stat: blue
+      value: 100
+    - stat: green
+      value: 50
+  - attackType: green
+    multipliersPercent:
+    - stat: red
+      value: 50
+    - stat: blue
+      value: 200
+    - stat: green
+      value: 100
+  encounters:
+  - id: Tutorial_01
+    enemies:
+    - Enemy_Construct_1
+    - Enemy_Construct_2
+    allies: []
+    background: ruins_night
+    bgm: tension
+    winNode: BattleTest_Win
+    loseNode: BattleTest_Lose
+    loseRule: 1
+  - id: Lab_Guard
+    enemies:
+    - Enemy_Construct_3
+    allies: []
+    background: lab
+    bgm: tension
+    winNode: ExploreExample_GuardWin
+    loseNode: ExploreExample_GuardLose
+    loseRule: 2

@@ -1,0 +1,9 @@
+﻿unit_id,display_name,side,type,hp,atk,def,spd,sp,skill_1,skill_2,skill_3,skill_4,passive,portrait_id
+유닛 id. 영어 숫자 _,화면 표시 이름,아군 또는 적,타입 (Battle_TypeChart.csv),체력,공격,방어,속도,기력,스킬 1,스킬 2,스킬 3,스킬 4,패시브 (아직 안 씀),전투 그림 (Art/Battle 또는 캐릭터 id). 비우면 unit_id
+영어 숫자 _,자유,ally 또는 enemy,타입 이름 또는 빈칸,정수,정수,정수,정수,정수,skill_id,skill_id,skill_id,skill_id,빈칸,이름
+Ally_A,아군 A,ally,red,120,60,55,50,30,Strike,Flame_Slash,Guard_Up,Quick_Jab,,Ally_A
+Ally_B,아군 B,ally,blue,95,72,40,75,30,Quick_Jab,Tide_Pierce,Stun_Blow,Strike,,Ally_B
+Ally_C,아군 C,ally,green,105,45,50,55,40,Strike,Thorn_Burst,Mend,Regen_Field,,Ally_C
+Enemy_Construct_1,인조 생물 1,enemy,green,170,72,62,48,20,Claw,Stun_Blow,,,,Enemy_Construct_1
+Enemy_Construct_2,인조 생물 2,enemy,red,140,82,48,70,0,Claw,Ember_Bite,,,,Enemy_Construct_2
+Enemy_Construct_3,인조 생물 3,enemy,blue,330,80,72,40,0,Claw,Tidal_Crush,,,,Enemy_Construct_3

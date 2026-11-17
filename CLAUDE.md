@@ -27,14 +27,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |---|---|
 | 기본 세팅 (Player Settings, TMP, 폰트, 빌드 씬) | `Tools > Project Vita > 1단계 기본 세팅 적용` (여러 번 실행해도 안전) |
 | 커밋 전 Dynamic 폰트 비우기 | `Tools > Project Vita > Dynamic 폰트 비우기 (커밋 전)` |
-| 대사 씬 생성 (Yarn Project, 리소스 목록, Title/Story 씬, 빌드 씬) | `Tools > Project Vita > 대사 씬 생성 (Title, Story)`. 씬을 처음부터 다시 만든다. 씬은 손으로 고치지 말고 `Scripts/Editor/DialogueSetup.cs`를 고친다 |
+| 씬 생성 (Yarn Project, 리소스 목록, CSV 임포트, 씬 4개, 빌드 씬) | `Tools > Project Vita > 씬 생성 (Title, Story, Exploration, Battle)`. 씬을 처음부터 다시 만든다. 씬은 손으로 고치지 말고 `Scripts/Editor/DialogueSetup.cs`를 고친다 |
 | 리소스 목록 갱신 | 자동 (Art, Audio 폴더나 `Characters.csv`가 바뀌면 `Resources/AssetCatalog.asset`이 저절로 갱신됨). 수동: `Tools > Project Vita > 리소스 목록 갱신` |
 | 임시 그림과 소리 만들기 | `Tools > Project Vita > 임시 그림과 소리 만들기`. 목록은 `Scripts/Editor/PlaceholderArt.cs`. **이미 있는 파일은 건너뛴다** (최종 아트를 덮어쓰지 않음) |
 | 에피소드 표 검사 | `Tools > Project Vita > 에피소드 표 검사` (start_node 노드 존재, next_episode, 씬 등록 확인) |
 | 대사 플레이 | `Title` 씬에서 Play → `처음부터` (표의 첫 에피소드) 또는 오른쪽 `에피소드 선택 (개발용)`. `Story` 씬을 바로 Play하면 `StoryDirector.fallbackEpisodeId` (비면 첫 에피소드) |
 | 에피소드 목록 | `Assets/_Project/Data/Episodes.csv`: `episode_id, display_name, unity_scene, start_node, next_episode`. 행을 추가하면 타이틀의 에피소드 버튼도 늘어난다 |
-| CSV 임포트 | `(TBD: 4-5단계 메뉴 경로)` |
-| 전투 시뮬레이터 | `(TBD: 4-6단계)` |
+| CSV 임포트 (탐색, 전투) | 자동 (`Data/Exploration_*.csv`, `Battle_*.csv`가 바뀌면). 수동: `Tools > Project Vita > CSV 임포트 (탐색, 전투)`. 없는 Yarn 노드, 중복 id, 없는 스킬/상태이상/유닛, 효과 문법, 조건식 오류를 행 번호와 함께 경고 |
+| 전투 시뮬레이터 | `Tools > Project Vita > 전투 시뮬레이터` (조우, 반복 횟수, 아군 AI 랜덤/탐욕 → 승률, 평균 라운드, 유닛별 피해, 스킬 빈도, CSV 저장). 코드에서는 `BattleSimulatorWindow.Simulate(...)` |
+| 탐색, 전투 예시 | 타이틀의 개발용 에피소드 선택에서 `[예시] 탐색 확인`(ExploreTest), `[예시] 전투 확인`(BattleTest). 대사는 `Dialogue/_Example/ExploreExample.yarn`, `BattleExample.yarn` |
 | 테스트 | 없음 |
 | 에디터 없이 컴파일 확인 | Unity가 만든 `Assembly-CSharp.csproj`는 `dotnet build`로 빌드된다. 새 `.cs`는 Unity가 csproj를 다시 만들기 전까지 빠져 있으니, 복사본 csproj에 `<Compile Include>`를 추가해서 확인한다 |
 
@@ -75,7 +76,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   | `<<bgm 이름 [페이드]>>`, `<<bgm stop [페이드]>>`, `<<sfx 이름 [볼륨]>>` | X | BGM은 에피소드가 바뀌어도 이어진다 |
   | `<<episode episode_id>>` | - | 즉시 이동 |
   | `<<wait 초>>`, `<<stop>>` | O | Yarn 내장 |
-  | `<<explore>>`, `<<battle>>` | X | 아직 로그만 (4-5, 4-6) |
+  | `<<explore 장소id>>` | - | 탐색 씬의 그 장소로 (Exploration_Location.csv) |
+  | `<<battle 조우id>>` | - | 전투로. 끝나면 시작한 씬(이야기 또는 탐색 장소)으로 돌아와 win_node/lose_node 실행. BGM도 전투 전으로 |
+  | `<<title>>` | - | 타이틀로 |
 
   - 캐릭터는 id(`Protagonist`)나 Yarn 화자 이름(`주인공`) 둘 다 된다. 표정, 배경, 소리 이름은 파일 이름이다.
   - 등록되지 않은 명령은 Yarn이 일반 로그만 남기므로, `StoryPresenter.RunCommand`가 경고를 띄운다.
@@ -105,8 +108,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `AudioManager` (DontDestroyOnLoad): BGM 크로스페이드, 효과음. `ScreenFader` (DontDestroyOnLoad): 씬 전환 페이드.
   - `GameSettings` (PlayerPrefs: 음량, 텍스트 속도 1~10, 창 모드), `GamePause` (timeScale 0, 대사 입력 차단), `Tween` (DOTween 대신 쓰는 Awaitable 트윈), `UISkew` (UI 평행사변형).
 - **메뉴** (`Scripts/Runtime/Menus/`): `TitleMenu` (처음부터, 이어하기, 설정, 종료, 개발용 에피소드 선택), `PauseMenu` (Esc 또는 오른쪽 위 버튼), `SettingsPanel` (타이틀과 일시정지 공용).
-- **탐색**: 지도 → 장소 프리팹 → 클릭 영역(`object_id`) → Yarn 노드. 데이터는 `Exploration_*.csv`다.
-- **전투**: 순수 C# `BattleCore`가 이벤트를 내보내고, `BattlePresenter`가 그것을 재생한다. 규칙은 인터페이스로 교체할 수 있다. 데이터는 `Battle_*.csv`다. 상세 내용은 `Docs/Dev/02_전투뼈대설계.md`에 있다.
+- **탐색** (`Scripts/Runtime/Exploration/`, Exploration 씬): 지도 → 장소 → 오브젝트 클릭 → Yarn 노드 → 탐색으로 복귀. 대사 UI와 무대는 Story와 같은 것(`BuildDialogueScene`).
+  - 데이터: `Exploration_Location.csv` (location_id, display_name, background, enter_node, unlock_if), `Exploration_Object.csv` (object_id, location_id, display_name, node, show_if, once, area, encounter_id) → `Resources/ExplorationData.asset`
+  - **클릭 영역은 문서의 장소 프리팹 대신 CSV `area` 열**(`x y 너비 높이`, 1920x1080, 왼쪽 위 기준)로 정한다. 개발 빌드에서는 영역이 옅게 보인다.
+  - 조건(`unlock_if`, `show_if`)은 Yarn식 (`Story/YarnCondition.cs`: `$a and not $b`, `$day >= 2`, `==`, 괄호). 선언 초기값도 읽는다.
+  - 자동 변수: `$오브젝트id_seen`(대사가 끝나면), `$장소id_visited`(처음 들어갈 때). 임포터가 `Dialogue/_Generated/Exploration.yarn`에 선언을 만든다 (다른 파일에서 또 declare하면 중복 오류).
+  - enter_node는 처음 들어갈 때 한 번만. once 오브젝트는 조사 후 사라짐. encounter_id가 있으면 대사 뒤 전투.
+  - 에피소드의 unity_scene이 Exploration이면 start_node를 먼저 실행하고 지도를 보여 준다. 나갈 때는 대사에서 `<<episode>>`, `<<explore>>`, `<<battle>>`, `<<title>>`.
+  - 세이브: 장소에 들어갈 때와 조사 후 (scene=Exploration, location). 이어하기는 그 장소로.
+- **전투** (`Scripts/Runtime/Battle/`, Battle 씬, 문서 02)
+  - `BattleCore`: 순수 C#. `Start()` → `RunRound(아군 행동)` → `TakeEvents()`. 아군 행동이 null이면 `Rules.AllyAI`가 고른다 (자동 전투, 시뮬레이터). 난수는 `System.Random(seed)` 하나.
+  - 교체 가능한 규칙 (`BattleRules`): `ITurnOrderRule`(속도순), `IDamageFormula`(포켓몬식), `IWinCondition`(전멸), `IActionResolver`(순서대로), `IUnitAI`(가중치 랜덤, 탐욕). 스탯 이름(hp, atk, def, spd), 출전 인원 3, 라운드 제한 99도 여기. `TODO(규칙 대기)`
+  - 데이터: `Battle_Stat`, `Battle_Unit`(스탯 열 = stat_id), `Battle_Skill`, `Battle_Status`, `Battle_TypeChart`, `Battle_Encounter` → `Resources/BattleDatabase.asset`
+  - 효과 문법: `Damage(power)` `FixedDamage(n)` `PercentDamage(n)` `Heal(n%)` `ApplyStatus(id,턴,확률%)` `RemoveStatus(id)` `ModifyStat(stat,단계)` `ChangeGauge(id,양)` `SkipTurn()`을 `;`로 잇는다. 앞에 `self:`(사용자), `other:`(OnHit의 공격자). 쉼표가 있으니 CSV 칸을 따옴표로 감싼다.
+  - 스킬 비용 = 게이지(`cost_kind`), 게이지 처음 값은 같은 이름의 스탯. 상태이상 트리거: turn_start, turn_end, on_hit, on_act.
+  - `BattleController` + `BattleUnitView`: 이벤트를 순서대로 재생 (HP 바, 데미지 숫자, 흔들림, 급소 플래시, 로그). 스킬은 클릭 또는 숫자 키, 대상은 클릭, 오른쪽 클릭이나 뒤로 버튼으로 취소. 개발 빌드에 자동 전투 버튼.
+  - 패배 처리 `lose_rule`: gameover(타이틀로), retry(다시), continue(lose_node). 전투 그림: `Art/Battle/{portrait_id}.png`, 없으면 같은 id 캐릭터의 기본 표정.
+  - 더미 데이터(아군 3, 적 3, 스킬 12, 상태이상 3)는 세계관 고유명사를 쓰지 않는다. 비디님의 양식이 오면 CSV와 규칙 클래스를 바꾼다.
 - **데이터 테이블**: `Assets/_Project/Data/*.csv`, UTF-8 BOM, LF. 1행은 컬럼명, 2행은 설명, 3행은 허용값이다. id는 영어로 쓴다.
 
 ## Gotchas
@@ -119,6 +137,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 에디터 도구의 네임스페이스는 `.EditorTools`로 한다. `.Editor`로 끝나면 `: Editor`가 `UnityEditor.Editor` 대신 그 네임스페이스로 해석된다.
 - Unity YAML에서 한글 오브젝트 이름은 유니코드 이스케이프(`\uXXXX`)로 저장된다. 프리팹을 한글로 grep하면 찾지 못한다.
 - 사용자는 파섹으로 원격 접속한다. UI와 씬 구성은 손으로 하기보다 **에디터 스크립트로 생성**하는 쪽을 선호한다.
+- **새 .yarn 파일은 Yarn Project에 저절로 안 들어간다** (Yarn Spinner 3.3.2. 기존 파일 수정은 반영됨). `Editor/YarnProjectAutoRefresh.cs`가 Dialogue 폴더의 .yarn 추가/삭제/이동 때 프로젝트를 다시 임포트한다.
+- ScriptableObject 클래스는 **클래스 이름과 같은 파일**에 둔다. 다른 파일에 있으면 에셋이 스크립트를 잃는다 (`m_Script: {fileID: 0}`).
+- `EditorApplication.delayCall`은 에디터에 포커스가 없으면 돌지 않을 때가 있다. 리소스 목록과 CSV 자동 갱신은 Unity로 돌아오면 돈다. 꼭 바로 해야 하는 것은 후처리기 안에서 직접 한다.
+- UI는 선형 색공간에서 섞여서 낮은 알파도 진하게 보인다. 반투명 강조색은 알파를 작게 잡는다. 자식 Image는 항상 부모 위에 그려지니, 카드 테두리는 `Outline` 효과로 만든다.
 - **Yarn 명령의 float 기본값**: Yarn Spinner 3.3.2 소스 제너레이터가 `float time = 0.6f`를 `0.6`(double)로 옮겨 써서 컴파일 에러가 난다. 소수 기본값은 `-1`(`StoryCommands.Auto`)로 두고 메서드 안에서 바꾼다. 정수 기본값은 괜찮다.
 - 생성된 Yarn 코드를 보려면 복사본 csproj를 `dotnet build -p:EmitCompilerGeneratedFiles=true -p:CompilerGeneratedFilesOutputPath=gen`으로 빌드한다.
 - **MCP for Unity**는 프로젝트 `.mcp.json` (`http://127.0.0.1:8080/mcp`)으로 연결한다. 서버는 Unity의 `Window > MCP for Unity`에서 시작한다 (에디터 시작 시 자동 실행 옵션이 꺼져 있으면 Unity를 재시작할 때마다 다시 눌러야 한다). VS Code 확장은 프로젝트 경로를 `c:/...`(소문자)로, Configure 버튼은 `~/.claude.json`에 `C:/...`(대문자)로 저장해서 서로 안 맞는다.
