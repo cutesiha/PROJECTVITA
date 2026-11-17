@@ -27,7 +27,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |---|---|
 | 기본 세팅 (Player Settings, TMP, 폰트, 빌드 씬) | `Tools > Project Vita > 1단계 기본 세팅 적용` (여러 번 실행해도 안전) |
 | 커밋 전 Dynamic 폰트 비우기 | `Tools > Project Vita > Dynamic 폰트 비우기 (커밋 전)` |
-| 대사 씬 생성 (Yarn Project, Title/Story 씬, 빌드 씬) | `Tools > Project Vita > 2단계 대사 씬 생성`. 씬을 처음부터 다시 만든다. 씬은 손으로 고치지 말고 `Scripts/Editor/DialogueSetup.cs`를 고친다 |
+| 대사 씬 생성 (Yarn Project, 리소스 목록, Title/Story 씬, 빌드 씬) | `Tools > Project Vita > 대사 씬 생성 (Title, Story)`. 씬을 처음부터 다시 만든다. 씬은 손으로 고치지 말고 `Scripts/Editor/DialogueSetup.cs`를 고친다 |
+| 리소스 목록 갱신 | 자동 (Art, Audio 폴더나 `Characters.csv`가 바뀌면 `Resources/AssetCatalog.asset`이 저절로 갱신됨). 수동: `Tools > Project Vita > 리소스 목록 갱신` |
+| 임시 그림과 소리 만들기 | `Tools > Project Vita > 임시 그림과 소리 만들기`. 목록은 `Scripts/Editor/PlaceholderArt.cs`. **이미 있는 파일은 건너뛴다** (최종 아트를 덮어쓰지 않음) |
 | 에피소드 표 검사 | `Tools > Project Vita > 에피소드 표 검사` (start_node 노드 존재, next_episode, 씬 등록 확인) |
 | 대사 플레이 | `Title` 씬에서 Play → `처음부터` (표의 첫 에피소드) 또는 오른쪽 `에피소드 선택 (개발용)`. `Story` 씬을 바로 Play하면 `StoryDirector.fallbackEpisodeId` (비면 첫 에피소드) |
 | 에피소드 목록 | `Assets/_Project/Data/Episodes.csv`: `episode_id, display_name, unity_scene, start_node, next_episode`. 행을 추가하면 타이틀의 에피소드 버튼도 늘어난다 |
@@ -43,7 +45,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `main`: 사용자가 관리한다. 코드, 씬, 반영이 끝난 대사가 있다.
 - `dialogue`: 팀원이 `Assets/_Project/Dialogue/**/*.yarn`만 커밋한다. 사용자가 `main`으로 머지하고, 작가의 `// 연출 메모`를 명령으로 바꾼다.
 - `.meta`는 사용자만 커밋한다. 작가가 만든 새 `.yarn`의 `.meta`는 사용자가 Unity에서 열 때 생성된다.
-- 커밋, 푸시, 브랜치 생성은 사용자가 요청할 때만 한다.
+- **Claude는 커밋하지 않는다.** 사용자가 GitHub Desktop으로 직접 커밋한다. 푸시, 머지, 브랜치 생성은 사용자가 요청할 때만 한다.
+- Unity가 열린 작업 폴더에서 브랜치를 체크아웃하지 않는다 (에셋이 다시 임포트된다). 브랜치를 맞출 때는 `git push origin main:dialogue`처럼 포인터만 옮긴다.
 
 ## Dialogue (Yarn Spinner)
 
@@ -56,11 +59,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 선택지는 `->`
   - 연출 메모는 `//` (주석이라 게임에 나오지 않는다)
 - 노드 이름은 `{EpisodeId}_{장면}`이고 영어, 숫자, `_`만 쓴다 (예: `Prologue_Start`, `Ch1_01_Start`).
-- 명령은 `Scripts/Runtime/Story/StoryCommands.cs`의 `[YarnCommand]` 정적 메서드다. Yarn이 컴파일할 때 자동 등록하고, 명령 정의를 `ProjectSettings/Packages/dev.yarnspinner/*.ysls.json`에 생성한다 (커밋한다). `(TBD: 4-4단계에서 인자 확정 후 갱신)`
-  - 동작함: `<<episode episode_id>>` (즉시 이동), `<<wait 초>>`, `<<stop>>` (둘은 Yarn 내장)
-  - 4-2에서는 로그만 찍음 (인자는 몇 개든 받음): `<<bg>>`, `<<show>>`, `<<hide>>`, `<<move>>`, `<<face>>`, `<<cg>>`, `<<fade>>`, `<<shake>>`, `<<bgm>>`, `<<sfx>>`, `<<explore>>`, `<<battle>>`
-  - 등록되지 않은 명령은 Yarn이 일반 로그만 남기므로, `StoryPresenter.RunCommand`가 경고를 띄운다. 명령을 추가하면 내장 목록에 자동 반영된다
-  - 표정 태그 `#face:표정` (4-4)
+- 명령은 `Scripts/Runtime/Story/StoryCommands.cs`의 `[YarnCommand]` 정적 메서드다. Yarn이 컴파일할 때 자동 등록하고, 명령 정의를 `ProjectSettings/Packages/dev.yarnspinner/*.ysls.json`에 생성한다 (커밋한다. VS Code 확장도 이것으로 명령을 검사한다). `[ ]`는 생략 가능.
+
+  | 명령 | 기다림 | 비고 |
+  |---|---|---|
+  | `<<bg 이름 [cut\|fade\|wipe] [시간]>>` | O | `none`이면 배경 지움. 기본 fade 0.6 |
+  | `<<cg 이름 [cut\|fade] [시간]>>`, `<<cg off>>` | O | 스탠딩 위에 뜬다 |
+  | `<<show 캐릭터 [표정] [위치] [시간]>>` | X | 위치 `left center right farleft farright`. 표정 없이 위치만 써도 됨. 이미 있으면 표정과 위치만 바꿈 |
+  | `<<hide 캐릭터 [시간]>>`, `<<hide all>>` | X | |
+  | `<<move 캐릭터 위치 [시간]>>` | X | |
+  | `<<face 캐릭터 표정>>` | X | 줄 끝 태그 `#face:표정`도 됨 (그 줄의 화자에게 적용) |
+  | `<<fade out [시간] [black\|white\|#색]>>`, `<<fade in [시간]>>` | O | 대사창까지 덮는다. fade in 뒤에 대사를 쓴다 |
+  | `<<shake [세기] [시간]>>` | X | 세기 1 = 약 30px. 무대만 흔든다 |
+  | `<<flash [색] [시간]>>`, `<<vignette on\|off\|0~1>>` | X | |
+  | `<<bgm 이름 [페이드]>>`, `<<bgm stop [페이드]>>`, `<<sfx 이름 [볼륨]>>` | X | BGM은 에피소드가 바뀌어도 이어진다 |
+  | `<<episode episode_id>>` | - | 즉시 이동 |
+  | `<<wait 초>>`, `<<stop>>` | O | Yarn 내장 |
+  | `<<explore>>`, `<<battle>>` | X | 아직 로그만 (4-5, 4-6) |
+
+  - 캐릭터는 id(`Protagonist`)나 Yarn 화자 이름(`주인공`) 둘 다 된다. 표정, 배경, 소리 이름은 파일 이름이다.
+  - 등록되지 않은 명령은 Yarn이 일반 로그만 남기므로, `StoryPresenter.RunCommand`가 경고를 띄운다.
 - 작가 가이드는 `Docs/`에 있다 `(TBD)`. 문법이 바뀌면 같이 고친다.
 - **Yarn 함정**
   - 나레이션 줄의 첫 `:` 앞부분은 화자 이름이 된다. 문장을 바꾸거나 `\:`로 쓴다.
@@ -71,16 +89,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture
 
 `(TBD: 단계가 진행될 때마다 채운다)`
-- **씬**: 모드 단위다. `Title`, `Story` (4-2 완료), `Exploration`, `Battle` `(TBD)`. 에피소드는 `Episodes.csv`의 `start_node`로 구분하고, 전용 씬이 필요한 에피소드만 `unity_scene` 열에 씬 이름을 쓴다 (Story 씬을 복제해서 만들고 Build Settings에 추가).
+- **씬**: 모드 단위다. `Title`, `Story` (4-2, 4-4), `Exploration`, `Battle` `(TBD)`. 에피소드는 `Episodes.csv`의 `start_node`로 구분하고, 전용 씬이 필요한 에피소드만 `unity_scene` 열에 씬 이름을 쓴다 (Story 씬을 복제해서 만들고 Build Settings에 추가).
 - **에피소드 흐름** (`Scripts/Runtime/Story/`)
   - `EpisodeFlow` (정적): 현재 에피소드, 씬 로드. **에피소드를 시작할 때는 항상 씬을 새로 로드한다** (Story → Story도). DialogueRunner를 중간에 멈출 필요가 없다.
   - `StoryDirector`: 씬이 뜨면 현재 에피소드의 `start_node`를 실행한다. 대사가 끝나면 `next_episode`로, 비어 있으면 타이틀로 간다.
   - `<<episode X>>`: `EpisodeFlow.TryGo` 후, 씬이 바뀌어 토큰이 취소될 때까지 기다린다 (다음 대사가 보이지 않게).
   - `GameVariables`: Yarn 변수 저장소를 `DontDestroyOnLoad`에 둔다. 씬을 다시 로드해도 변수가 유지되고, 타이틀에서 새로 시작할 때만 비운다.
-  - `StoryPresenter` (`DialoguePresenterBase`): 이름표, 본문, 클릭/Space/Enter로 넘기기, 선택지 (클릭 또는 숫자 키). 대사창과 배경의 `raycastTarget`은 꺼 둔다 (버튼 위 클릭만 넘기기에서 제외하려고).
+  - `StoryPresenter` (`DialoguePresenterBase`): 이름표(캐릭터 색), 타이핑 효과(진행 중 클릭하면 끝까지 표시), 나레이션 모드(이름표 숨김, 본문 색), `#face:` 태그, 말하는 사람 강조, 선택지 (클릭 또는 숫자 키). 대사창과 무대의 `raycastTarget`은 꺼 둔다 (버튼 위 클릭만 넘기기에서 제외하려고). 노드에 들어갈 때 `NodeEntered` 이벤트를 낸다.
+  - `StoryStage`: 무대 (배경 2장 크로스페이드, 스탠딩, CG, 비네트, 와이프, 플래시, 페이드, 흔들림). 세이브용 `GetState`/`ApplyState`.
+  - `SaveSystem`: 노드에 들어갈 때마다 `persistentDataPath/autosave.json`에 자동 저장 (에피소드, 노드, 변수, 무대, BGM). 타이틀의 이어하기는 그 노드 처음부터 다시 시작한다. 슬롯 UI는 4-7.
   - `DevOverlay`: 에피소드, 노드, 최근 명령을 왼쪽 위에 표시한다. F1로 숨긴다. Development Build가 아니면 꺼진다.
-- **CSV 읽기**: `Scripts/Runtime/Core/CsvTable.cs` (BOM, 따옴표, CRLF 처리, 4행부터 데이터). 4-5 임포터도 이것을 쓴다.
-- **VN 표시층**: 대사창, 스탠딩, 배경, CG, 트랜지션, 오디오. 캐릭터 정의는 ScriptableObject로 한다 (`characterName` = Yarn 화자 이름, 표정 → 스프라이트).
+- **공용** (`Scripts/Runtime/Core/`)
+  - `CsvTable`: BOM, 따옴표, CRLF 처리, 4행부터 데이터. 4-5 임포터도 이것을 쓴다.
+  - `AssetCatalog` (`Resources/AssetCatalog.asset`): 이름 → 그림/소리/캐릭터. `Editor/AssetCatalogBuilder`가 폴더를 감시해서 자동으로 채운다. 캐릭터 = `Data/Characters.csv` (`character_id, yarn_name, name_color`) + `Art/Characters/{id}/{id}_{표정}.png`.
+  - `AudioManager` (DontDestroyOnLoad): BGM 크로스페이드, 효과음. `ScreenFader` (DontDestroyOnLoad): 씬 전환 페이드.
+  - `GameSettings` (PlayerPrefs: 음량, 텍스트 속도 1~10, 창 모드), `GamePause` (timeScale 0, 대사 입력 차단), `Tween` (DOTween 대신 쓰는 Awaitable 트윈), `UISkew` (UI 평행사변형).
+- **메뉴** (`Scripts/Runtime/Menus/`): `TitleMenu` (처음부터, 이어하기, 설정, 종료, 개발용 에피소드 선택), `PauseMenu` (Esc 또는 오른쪽 위 버튼), `SettingsPanel` (타이틀과 일시정지 공용).
 - **탐색**: 지도 → 장소 프리팹 → 클릭 영역(`object_id`) → Yarn 노드. 데이터는 `Exploration_*.csv`다.
 - **전투**: 순수 C# `BattleCore`가 이벤트를 내보내고, `BattlePresenter`가 그것을 재생한다. 규칙은 인터페이스로 교체할 수 있다. 데이터는 `Battle_*.csv`다. 상세 내용은 `Docs/Dev/02_전투뼈대설계.md`에 있다.
 - **데이터 테이블**: `Assets/_Project/Data/*.csv`, UTF-8 BOM, LF. 1행은 컬럼명, 2행은 설명, 3행은 허용값이다. id는 영어로 쓴다.
@@ -95,7 +119,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 에디터 도구의 네임스페이스는 `.EditorTools`로 한다. `.Editor`로 끝나면 `: Editor`가 `UnityEditor.Editor` 대신 그 네임스페이스로 해석된다.
 - Unity YAML에서 한글 오브젝트 이름은 유니코드 이스케이프(`\uXXXX`)로 저장된다. 프리팹을 한글로 grep하면 찾지 못한다.
 - 사용자는 파섹으로 원격 접속한다. UI와 씬 구성은 손으로 하기보다 **에디터 스크립트로 생성**하는 쪽을 선호한다.
-- **MCP for Unity**는 프로젝트 `.mcp.json` (`http://127.0.0.1:8080/mcp`)으로 연결한다. VS Code 확장은 프로젝트 경로를 `c:/...`(소문자)로, Configure 버튼은 `~/.claude.json`에 `C:/...`(대문자)로 저장해서 서로 안 맞는다.
+- **Yarn 명령의 float 기본값**: Yarn Spinner 3.3.2 소스 제너레이터가 `float time = 0.6f`를 `0.6`(double)로 옮겨 써서 컴파일 에러가 난다. 소수 기본값은 `-1`(`StoryCommands.Auto`)로 두고 메서드 안에서 바꾼다. 정수 기본값은 괜찮다.
+- 생성된 Yarn 코드를 보려면 복사본 csproj를 `dotnet build -p:EmitCompilerGeneratedFiles=true -p:CompilerGeneratedFilesOutputPath=gen`으로 빌드한다.
+- **MCP for Unity**는 프로젝트 `.mcp.json` (`http://127.0.0.1:8080/mcp`)으로 연결한다. 서버는 Unity의 `Window > MCP for Unity`에서 시작한다 (에디터 시작 시 자동 실행 옵션이 꺼져 있으면 Unity를 재시작할 때마다 다시 눌러야 한다). VS Code 확장은 프로젝트 경로를 `c:/...`(소문자)로, Configure 버튼은 `~/.claude.json`에 `C:/...`(대문자)로 저장해서 서로 안 맞는다.
 - **MCP로 플레이 테스트할 때**
   - 에디터가 포커스를 잃으면 플레이 루프가 멈춘다 (`runInBackground` false). 플레이 중에 `Application.runInBackground = true`를 실행한다 (런타임 값이라 설정은 바뀌지 않는다).
   - 포커스가 없으면 Input System이 키와 마우스 입력(시뮬레이션 포함)을 게임에 보내지 않는다. 입력 확인은 사용자 플레이로 한다.

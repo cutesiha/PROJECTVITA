@@ -1,20 +1,24 @@
+using ProjectVita.Core;
 using ProjectVita.Story;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace ProjectVita.Menus
 {
     /// <summary>
-    /// 4-2단계 최소 타이틀: 처음부터, 에피소드 선택(개발용), 종료.
+    /// 타이틀: 처음부터, 이어하기, 설정, 종료, 에피소드 선택(개발용).
     /// 에피소드 버튼은 Episodes.csv의 행마다 실행 중에 만든다. CSV에 행을 추가하면 버튼도 늘어난다.
-    /// TODO(4-4): 이어하기, 설정, 디자인.
     /// </summary>
     public sealed class TitleMenu : MonoBehaviour
     {
         [SerializeField] TextAsset episodesCsv;
         [SerializeField] Button startButton;
+        [SerializeField] Button continueButton;
+        [SerializeField] Button settingsButton;
         [SerializeField] Button quitButton;
+        [SerializeField] SettingsPanel settings;
 
         [Header("에피소드 선택 (Development Build에서만 보인다)")]
         [SerializeField] GameObject episodePanel;
@@ -25,10 +29,16 @@ namespace ProjectVita.Menus
         {
             var table = EpisodeFlow.EnsureTable(episodesCsv);
 
+            // 타이틀에서는 이야기의 BGM을 끈다.
+            AudioManager.Instance.StopBgm(1f);
+
             var first = table.First;
             startButton.interactable = first != null;
             startButton.onClick.AddListener(() => EpisodeFlow.StartNewGame(first.Id));
-            quitButton.onClick.AddListener(Quit);
+            continueButton.interactable = SaveSystem.HasAutoSave;
+            continueButton.onClick.AddListener(() => EpisodeFlow.Continue());
+            settingsButton.onClick.AddListener(() => settings.Open());
+            quitButton.onClick.AddListener(QuitGame.Quit);
 
             episodeButtonTemplate.gameObject.SetActive(false);
             episodePanel.SetActive(Debug.isDebugBuild);
@@ -46,13 +56,10 @@ namespace ProjectVita.Menus
             }
         }
 
-        static void Quit()
+        void Update()
         {
-#if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-#else
-            Application.Quit();
-#endif
+            var kb = Keyboard.current;
+            if (kb != null && kb.escapeKey.wasPressedThisFrame && settings.IsOpen) settings.Close();
         }
     }
 }

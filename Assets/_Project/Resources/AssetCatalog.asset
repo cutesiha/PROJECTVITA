@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdd12a4ae70196a4c920ff2564c7313a, type: 3}
+  m_Name: AssetCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectVita.Core.AssetCatalog
+  backgrounds: []
+  cgs: []
+  bgm: []
+  sfx: []
+  characters:
+  - id: Protagonist
+    yarnName: "\uC8FC\uC778\uACF5"
+    nameColor: {r: 0.7019608, g: 0.14901961, b: 0.11764706, a: 1}
+    expressions: []
+  - id: Stranger
+    yarnName: ???
+    nameColor: {r: 0.29411766, g: 0.3254902, b: 0.5803922, a: 1}
+    expressions: []
