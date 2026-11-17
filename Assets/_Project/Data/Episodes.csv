@@ -1,0 +1,6 @@
+﻿episode_id,display_name,unity_scene,start_node,next_episode
+에피소드 id. 영어 숫자 _ 만 쓴다,화면에 보이는 이름,전용 씬이 필요할 때만 씬 이름. 비우면 Story 씬,처음 실행할 Yarn 노드 (title),대사가 끝나면 이어질 episode_id. 비우면 타이틀로 돌아간다
+영어 숫자 _,자유,빈칸 또는 Build Settings의 씬 이름,Yarn 노드 이름,episode_id 또는 빈칸
+Prologue,프롤로그,,Prologue_Start,Ch1_01
+Ch1_01,챕터 1-1,,Ch1_01_Start,
+Example,[예시] 문법 확인,,Example_Start,

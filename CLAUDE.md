@@ -27,8 +27,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |---|---|
 | 기본 세팅 (Player Settings, TMP, 폰트, 빌드 씬) | `Tools > Project Vita > 1단계 기본 세팅 적용` (여러 번 실행해도 안전) |
 | 커밋 전 Dynamic 폰트 비우기 | `Tools > Project Vita > Dynamic 폰트 비우기 (커밋 전)` |
-| 대사 플레이 | `(TBD: 4-2단계 후. 씬 이름, 시작 노드 지정 방법)` |
-| 에피소드 목록 | `Assets/_Project/Data/Episodes.csv` `(TBD)` |
+| 대사 씬 생성 (Yarn Project, Title/Story 씬, 빌드 씬) | `Tools > Project Vita > 2단계 대사 씬 생성`. 씬을 처음부터 다시 만든다. 씬은 손으로 고치지 말고 `Scripts/Editor/DialogueSetup.cs`를 고친다 |
+| 에피소드 표 검사 | `Tools > Project Vita > 에피소드 표 검사` (start_node 노드 존재, next_episode, 씬 등록 확인) |
+| 대사 플레이 | `Title` 씬에서 Play → `처음부터` (표의 첫 에피소드) 또는 오른쪽 `에피소드 선택 (개발용)`. `Story` 씬을 바로 Play하면 `StoryDirector.fallbackEpisodeId` (비면 첫 에피소드) |
+| 에피소드 목록 | `Assets/_Project/Data/Episodes.csv`: `episode_id, display_name, unity_scene, start_node, next_episode`. 행을 추가하면 타이틀의 에피소드 버튼도 늘어난다 |
 | CSV 임포트 | `(TBD: 4-5단계 메뉴 경로)` |
 | 전투 시뮬레이터 | `(TBD: 4-6단계)` |
 | 테스트 | 없음 |
@@ -45,19 +47,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Dialogue (Yarn Spinner)
 
-- `.yarn` 파일은 `Assets/_Project/Dialogue/` 아래에 있다 (Yarn Spinner가 임포트하려면 Assets 안이어야 한다). 하나의 Yarn Project가 이 폴더 전체를 포함하므로, 새 파일은 자동으로 들어간다.
+- Yarn Spinner for Unity **v3.3.2** (무료 Git 패키지, `manifest.json`에 `#v3.3.2` 태그로 고정). 올릴 때는 태그만 바꾼다. 3.3 문서는 `yarnspinner.dev/docs/unity/`에 있다 (`docs.yarnspinner.dev`는 3.2 이하).
+- `.yarn` 파일은 `Assets/_Project/Dialogue/` 아래에 있다 (Yarn Spinner가 임포트하려면 Assets 안이어야 한다). `Dialogue/Dialogue.yarnproject` 하나가 `**/*.yarn`으로 이 폴더 전체를 포함하므로, 새 파일은 자동으로 들어간다.
+- 예시와 문법 확인은 `Dialogue/_Example/Example.yarn` (에피소드 `Example`). 프롤로그와 챕터 1-1은 임시 대사다.
 - 작가 문법
   - `화자: 대사`
   - 화자가 없으면 나레이션이고, 이름표를 숨긴다
   - 선택지는 `->`
   - 연출 메모는 `//` (주석이라 게임에 나오지 않는다)
 - 노드 이름은 `{EpisodeId}_{장면}`이고 영어, 숫자, `_`만 쓴다 (예: `Prologue_Start`, `Ch1_01_Start`).
-- 명령 `(TBD: 4-4단계에서 확정 후 인자, 예시 갱신)`
-  - `<<bg>>`, `<<show>>`, `<<hide>>`, `<<move>>`, `<<face>>`
-  - `<<cg>>`, `<<fade>>`, `<<shake>>`, `<<wait>>`
-  - `<<bgm>>`, `<<sfx>>`
-  - `<<episode>>`, `<<explore>>`, `<<battle>>`
-  - 표정 태그 `#face:표정`
+- 명령은 `Scripts/Runtime/Story/StoryCommands.cs`의 `[YarnCommand]` 정적 메서드다. Yarn이 컴파일할 때 자동 등록하고, 명령 정의를 `ProjectSettings/Packages/dev.yarnspinner/*.ysls.json`에 생성한다 (커밋한다). `(TBD: 4-4단계에서 인자 확정 후 갱신)`
+  - 동작함: `<<episode episode_id>>` (즉시 이동), `<<wait 초>>`, `<<stop>>` (둘은 Yarn 내장)
+  - 4-2에서는 로그만 찍음 (인자는 몇 개든 받음): `<<bg>>`, `<<show>>`, `<<hide>>`, `<<move>>`, `<<face>>`, `<<cg>>`, `<<fade>>`, `<<shake>>`, `<<bgm>>`, `<<sfx>>`, `<<explore>>`, `<<battle>>`
+  - 등록되지 않은 명령은 Yarn이 일반 로그만 남기므로, `StoryPresenter.RunCommand`가 경고를 띄운다. 명령을 추가하면 내장 목록에 자동 반영된다
+  - 표정 태그 `#face:표정` (4-4)
 - 작가 가이드는 `Docs/`에 있다 `(TBD)`. 문법이 바뀌면 같이 고친다.
 - **Yarn 함정**
   - 나레이션 줄의 첫 `:` 앞부분은 화자 이름이 된다. 문장을 바꾸거나 `\:`로 쓴다.
@@ -68,7 +71,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture
 
 `(TBD: 단계가 진행될 때마다 채운다)`
-- **씬**: `Title`, `Story`, `Exploration`, `Battle` `(TBD)`. 에피소드와 Unity 씬의 연결은 `Episodes.csv`의 `unity_scene` 열로 한다.
+- **씬**: 모드 단위다. `Title`, `Story` (4-2 완료), `Exploration`, `Battle` `(TBD)`. 에피소드는 `Episodes.csv`의 `start_node`로 구분하고, 전용 씬이 필요한 에피소드만 `unity_scene` 열에 씬 이름을 쓴다 (Story 씬을 복제해서 만들고 Build Settings에 추가).
+- **에피소드 흐름** (`Scripts/Runtime/Story/`)
+  - `EpisodeFlow` (정적): 현재 에피소드, 씬 로드. **에피소드를 시작할 때는 항상 씬을 새로 로드한다** (Story → Story도). DialogueRunner를 중간에 멈출 필요가 없다.
+  - `StoryDirector`: 씬이 뜨면 현재 에피소드의 `start_node`를 실행한다. 대사가 끝나면 `next_episode`로, 비어 있으면 타이틀로 간다.
+  - `<<episode X>>`: `EpisodeFlow.TryGo` 후, 씬이 바뀌어 토큰이 취소될 때까지 기다린다 (다음 대사가 보이지 않게).
+  - `GameVariables`: Yarn 변수 저장소를 `DontDestroyOnLoad`에 둔다. 씬을 다시 로드해도 변수가 유지되고, 타이틀에서 새로 시작할 때만 비운다.
+  - `StoryPresenter` (`DialoguePresenterBase`): 이름표, 본문, 클릭/Space/Enter로 넘기기, 선택지 (클릭 또는 숫자 키). 대사창과 배경의 `raycastTarget`은 꺼 둔다 (버튼 위 클릭만 넘기기에서 제외하려고).
+  - `DevOverlay`: 에피소드, 노드, 최근 명령을 왼쪽 위에 표시한다. F1로 숨긴다. Development Build가 아니면 꺼진다.
+- **CSV 읽기**: `Scripts/Runtime/Core/CsvTable.cs` (BOM, 따옴표, CRLF 처리, 4행부터 데이터). 4-5 임포터도 이것을 쓴다.
 - **VN 표시층**: 대사창, 스탠딩, 배경, CG, 트랜지션, 오디오. 캐릭터 정의는 ScriptableObject로 한다 (`characterName` = Yarn 화자 이름, 표정 → 스프라이트).
 - **탐색**: 지도 → 장소 프리팹 → 클릭 영역(`object_id`) → Yarn 노드. 데이터는 `Exploration_*.csv`다.
 - **전투**: 순수 C# `BattleCore`가 이벤트를 내보내고, `BattlePresenter`가 그것을 재생한다. 규칙은 인터페이스로 교체할 수 있다. 데이터는 `Battle_*.csv`다. 상세 내용은 `Docs/Dev/02_전투뼈대설계.md`에 있다.
@@ -84,6 +95,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 에디터 도구의 네임스페이스는 `.EditorTools`로 한다. `.Editor`로 끝나면 `: Editor`가 `UnityEditor.Editor` 대신 그 네임스페이스로 해석된다.
 - Unity YAML에서 한글 오브젝트 이름은 유니코드 이스케이프(`\uXXXX`)로 저장된다. 프리팹을 한글로 grep하면 찾지 못한다.
 - 사용자는 파섹으로 원격 접속한다. UI와 씬 구성은 손으로 하기보다 **에디터 스크립트로 생성**하는 쪽을 선호한다.
+- **MCP for Unity**는 프로젝트 `.mcp.json` (`http://127.0.0.1:8080/mcp`)으로 연결한다. VS Code 확장은 프로젝트 경로를 `c:/...`(소문자)로, Configure 버튼은 `~/.claude.json`에 `C:/...`(대문자)로 저장해서 서로 안 맞는다.
+- **MCP로 플레이 테스트할 때**
+  - 에디터가 포커스를 잃으면 플레이 루프가 멈춘다 (`runInBackground` false). 플레이 중에 `Application.runInBackground = true`를 실행한다 (런타임 값이라 설정은 바뀌지 않는다).
+  - 포커스가 없으면 Input System이 키와 마우스 입력(시뮬레이션 포함)을 게임에 보내지 않는다. 입력 확인은 사용자 플레이로 한다.
+  - **`InputSystem.settings`를 런타임에 바꾸거나 새 인스턴스로 교체하지 않는다.** 도메인 리로드 뒤에도 Input System이 깨지고, 복구하면 장치 목록이 사라져서 에디터를 재시작해야 한다.
+  - `manage_camera` screenshot은 `Assets/Screenshots/`에 저장된다. 테스트 후 지운다.
 
 ## Conventions
 
