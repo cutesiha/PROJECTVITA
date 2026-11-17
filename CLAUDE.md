@@ -1,0 +1,94 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+> 2026-11-17 시작. 단계가 진행될 때마다 `(TBD)` 부분을 실제 내용으로 채운다. 작업 순서와 배경은 `Docs/Dev/01_프로젝트환경구축.md`, 전투 설계는 `Docs/Dev/02_전투뼈대설계.md`에 있다.
+
+## Project
+
+- 가제 미정 (세계관 문서명은 "PROJECT : VITA"). 스토리 게임에 **포인트앤클릭 탐색**과 **포켓몬식 스탯 기반 턴제 전투**(인물이 싸우고, 인조 생물은 적)를 섞은 2D 게임이다.
+- 목표
+  - 2027년 3월 행사용 데모 (03-22 데브캠프, 03-31 스마일게이트 공모전, 04-06 인디크래프트, 04-10 BIC)
+  - 2027년 5월 전후 스토브 / itch.io / 스팀 출시
+- Unity **6000.3.11f1** (Unity 6.3 LTS), URP 2D 템플릿. 새 PC에도 같은 버전을 설치한다.
+- Git 루트 = Unity 프로젝트 루트. GitHub `cutesiha/PROJECTVITA`.
+- 팀
+  - **사용자** (팀장): 프로그래밍, 디렉팅, 기획 정리, 빌드, QA
+  - **비디**: 시나리오, 캐릭터, 기획 전반 (전투 규칙 포함)
+  - **두부**: 일러스트, 배경, UI 아트
+  - 비디와 두부는 Git과 Unity를 모른다. 대사는 VS Code로 쓰고, GitHub Desktop으로 `dialogue` 브랜치에 올린다.
+- 레퍼런스는 림버스 컴퍼니, 네가 죽어, 단간론파다. UI와 연출의 감각만 참고하고, 에셋, 레이아웃, 로고는 베끼지 않는다.
+- **이전 팀 프로젝트(BlackJokerTrials)와 그 계열(Devdup, DOS, HelpDoNyang)의 코드, 프리팹, 아트, 유료 에셋은 쓰지 않는다.** 이 레포의 모든 시스템은 새로 작성한 것이다.
+- 기획(스토리, 캐릭터, 전투 규칙)은 비디의 영역이다. Claude는 대신 확정하지 않고, 필요하면 질문 목록이나 양식을 만들어 사용자에게 준다.
+
+## Commands
+
+| Task | How |
+|---|---|
+| 기본 세팅 (Player Settings, TMP, 폰트, 빌드 씬) | `Tools > Project Vita > 1단계 기본 세팅 적용` (여러 번 실행해도 안전) |
+| 커밋 전 Dynamic 폰트 비우기 | `Tools > Project Vita > Dynamic 폰트 비우기 (커밋 전)` |
+| 대사 플레이 | `(TBD: 4-2단계 후. 씬 이름, 시작 노드 지정 방법)` |
+| 에피소드 목록 | `Assets/_Project/Data/Episodes.csv` `(TBD)` |
+| CSV 임포트 | `(TBD: 4-5단계 메뉴 경로)` |
+| 전투 시뮬레이터 | `(TBD: 4-6단계)` |
+| 테스트 | 없음 |
+| 에디터 없이 컴파일 확인 | Unity가 만든 `Assembly-CSharp.csproj`는 `dotnet build`로 빌드된다. 새 `.cs`는 Unity가 csproj를 다시 만들기 전까지 빠져 있으니, 복사본 csproj에 `<Compile Include>`를 추가해서 확인한다 |
+
+**Windows에서 Python을 실행할 때**: `python3`이나 `python`이 Microsoft Store 스텁으로 연결되어 있으면, `Python`만 출력하고 exit 49로 끝난다. 실제 설치 여부를 먼저 확인한다. 없으면 `dotnet`으로 대체하거나 사용자에게 설치를 묻는다.
+
+## Branches
+
+- `main`: 사용자가 관리한다. 코드, 씬, 반영이 끝난 대사가 있다.
+- `dialogue`: 팀원이 `Assets/_Project/Dialogue/**/*.yarn`만 커밋한다. 사용자가 `main`으로 머지하고, 작가의 `// 연출 메모`를 명령으로 바꾼다.
+- `.meta`는 사용자만 커밋한다. 작가가 만든 새 `.yarn`의 `.meta`는 사용자가 Unity에서 열 때 생성된다.
+- 커밋, 푸시, 브랜치 생성은 사용자가 요청할 때만 한다.
+
+## Dialogue (Yarn Spinner)
+
+- `.yarn` 파일은 `Assets/_Project/Dialogue/` 아래에 있다 (Yarn Spinner가 임포트하려면 Assets 안이어야 한다). 하나의 Yarn Project가 이 폴더 전체를 포함하므로, 새 파일은 자동으로 들어간다.
+- 작가 문법
+  - `화자: 대사`
+  - 화자가 없으면 나레이션이고, 이름표를 숨긴다
+  - 선택지는 `->`
+  - 연출 메모는 `//` (주석이라 게임에 나오지 않는다)
+- 노드 이름은 `{EpisodeId}_{장면}`이고 영어, 숫자, `_`만 쓴다 (예: `Prologue_Start`, `Ch1_01_Start`).
+- 명령 `(TBD: 4-4단계에서 확정 후 인자, 예시 갱신)`
+  - `<<bg>>`, `<<show>>`, `<<hide>>`, `<<move>>`, `<<face>>`
+  - `<<cg>>`, `<<fade>>`, `<<shake>>`, `<<wait>>`
+  - `<<bgm>>`, `<<sfx>>`
+  - `<<episode>>`, `<<explore>>`, `<<battle>>`
+  - 표정 태그 `#face:표정`
+- 작가 가이드는 `Docs/`에 있다 `(TBD)`. 문법이 바뀌면 같이 고친다.
+- **Yarn 함정**
+  - 나레이션 줄의 첫 `:` 앞부분은 화자 이름이 된다. 문장을 바꾸거나 `\:`로 쓴다.
+  - `#`은 태그가 시작되는 기호다. 그 뒤가 잘리니 `\#`로 쓴다.
+  - `[ ]`는 마크업, `{ }`는 변수다. 대사에 쓰려면 `\[`, `\{`로 쓴다.
+  - 선언하지 않은 변수는 기본값이 없어서 조건문이 의도대로 동작하지 않는다. 변수는 `<<declare>>`로 선언한다.
+
+## Architecture
+
+`(TBD: 단계가 진행될 때마다 채운다)`
+- **씬**: `Title`, `Story`, `Exploration`, `Battle` `(TBD)`. 에피소드와 Unity 씬의 연결은 `Episodes.csv`의 `unity_scene` 열로 한다.
+- **VN 표시층**: 대사창, 스탠딩, 배경, CG, 트랜지션, 오디오. 캐릭터 정의는 ScriptableObject로 한다 (`characterName` = Yarn 화자 이름, 표정 → 스프라이트).
+- **탐색**: 지도 → 장소 프리팹 → 클릭 영역(`object_id`) → Yarn 노드. 데이터는 `Exploration_*.csv`다.
+- **전투**: 순수 C# `BattleCore`가 이벤트를 내보내고, `BattlePresenter`가 그것을 재생한다. 규칙은 인터페이스로 교체할 수 있다. 데이터는 `Battle_*.csv`다. 상세 내용은 `Docs/Dev/02_전투뼈대설계.md`에 있다.
+- **데이터 테이블**: `Assets/_Project/Data/*.csv`, UTF-8 BOM, LF. 1행은 컬럼명, 2행은 설명, 3행은 허용값이다. id는 영어로 쓴다.
+
+## Gotchas
+
+- **OneDrive 밖, 영문 경로**에 프로젝트를 둔다. OneDrive 동기화는 Library 잠금과 지연을, 한글 경로는 빌드 도구 문제를 일으킨다.
+- TMP Settings에서 **"Use Modern Hangul Line Breaking Rules"를 켠다.** TMP Essential Resources를 다시 임포트하면 꺼지니 `1단계 기본 세팅 적용` 메뉴를 다시 실행한다.
+- 한글 폰트는 Pretendard (OFL, `Assets/_Project/Art/Fonts/Pretendard/`)다. TMP 기본 폰트는 `Pretendard-Regular SDF` (Dynamic, 2048 멀티 아틀라스)이고, `<b>`는 `Pretendard-Bold SDF`를 쓴다.
+- Git LFS는 쓰지 않는다. `.gitattributes`에서 이미지, 오디오, 폰트는 `binary`다.
+- Dynamic TMP 폰트 에셋은 플레이하는 동안 커진다. 커밋 전에 비우거나, Static 아틀라스(KS X 1001 2350자)로 굽는다.
+- 에디터 도구의 네임스페이스는 `.EditorTools`로 한다. `.Editor`로 끝나면 `: Editor`가 `UnityEditor.Editor` 대신 그 네임스페이스로 해석된다.
+- Unity YAML에서 한글 오브젝트 이름은 유니코드 이스케이프(`\uXXXX`)로 저장된다. 프리팹을 한글로 grep하면 찾지 못한다.
+- 사용자는 파섹으로 원격 접속한다. UI와 씬 구성은 손으로 하기보다 **에디터 스크립트로 생성**하는 쪽을 선호한다.
+
+## Conventions
+
+- 게임 콘텐츠는 `Assets/_Project/`에 둔다 (`Dialogue`, `Art`, `Audio`, `Data`, `Prefabs`, `Scenes`, `ScriptableObjects`, `Scripts/Runtime`, `Scripts/Editor`). 문서는 `Docs/` (작가용), `Docs/Dev/` (개발용), 개발 도구는 `Tools/`에 둔다.
+- 빈 폴더는 `.gitkeep`으로 유지한다 (Unity는 `.`으로 시작하는 파일을 무시한다). 폴더에 실제 파일이 생기면 지운다.
+- 코드 네임스페이스는 `ProjectVita.*`이고 (에디터 도구는 `ProjectVita.EditorTools`), 주석은 한국어로 단다.
+- 임시 그림은 단색 PNG와 이름표로 만든다. 최종 아트는 같은 파일명으로 덮어쓴다. 다른 게임이나 이전 프로젝트의 그림은 넣지 않는다.
+- 커밋 메시지는 `type : message` (`init`, `feat`, `fix`, `minor`)다.

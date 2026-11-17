@@ -105,3 +105,9 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# ---- PROJECT VITA ----
+# Unity가 자동 생성하는 솔루션 (Unity 6.3+ .slnx)
+*.slnx
+# 빌드 결과물
+/[Bb]uild*/

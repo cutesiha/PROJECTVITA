@@ -1,171 +1,77 @@
-# Unity .gitattributes Template
-# Source: https://github.com/gitattributes/gitattributes/blob/master/Unity.gitattributes
-# Last synced: 2026-02-04
-# License: MIT
-#
-# This template is maintained from the gitattributes/gitattributes repository
-# and distributed under MIT License.
+# PROJECT VITA .gitattributes
+# Git LFS는 쓰지 않는다 (Docs/Dev/01_프로젝트환경구축.md 4-1). 레포가 1GB에 가까워지면 다시 검토한다.
 
-# Define macros (only works in top-level gitattributes files)
-[attr]lfs               filter=lfs diff=lfs merge=lfs -text
-[attr]unity-json        eol=lf linguist-language=json
-[attr]unity-yaml        merge=unityyamlmerge eol=lf linguist-language=yaml
+* text=auto
 
-# Optionally collapse Unity YAML files on GitHub diffs
-# [attr]unity-yaml        merge=unityyamlmerge text linguist-language=yaml linguist-generated
+# 대사와 데이터 (작가가 Windows에서 편집해도 LF로 저장)
+*.yarn          text eol=lf
+*.yarnproject   text eol=lf
+*.csv           text eol=lf
+*.md            text eol=lf
+*.json          text eol=lf
 
-# Unity source files
-*.cginc                 text
-*.compute               text linguist-language=hlsl
-*.cs                    text diff=csharp
-*.hlsl                  text linguist-language=hlsl
-*.raytrace              text linguist-language=hlsl
-*.shader                text
+# 코드
+*.cs            text eol=lf diff=csharp
+*.asmdef        text eol=lf
+*.asmref        text eol=lf
+*.shader        text eol=lf
+*.hlsl          text eol=lf
+*.cginc         text eol=lf
+*.uss           text eol=lf
+*.uxml          text eol=lf
+*.inputactions  text eol=lf
 
-# Unity JSON files
-*.asmdef                unity-json
-*.asmref                unity-json
-*.index                 unity-json
-*.inputactions          unity-json
-*.shadergraph           unity-json
-*.shadersubgraph        unity-json
+# Unity YAML
+[attr]unity-yaml text eol=lf merge=unityyamlmerge
+*.unity             unity-yaml
+*.prefab            unity-yaml
+*.asset             unity-yaml
+*.meta              unity-yaml
+*.mat               unity-yaml
+*.anim              unity-yaml
+*.controller        unity-yaml
+*.overrideController unity-yaml
+*.physicsMaterial2D unity-yaml
+*.playable          unity-yaml
+*.mixer             unity-yaml
+*.preset            unity-yaml
+*.spriteatlas       unity-yaml
+*.spriteatlasv2     unity-yaml
+*.scenetemplate     unity-yaml
+*.renderTexture     unity-yaml
+*.signal            unity-yaml
+*.lighting          unity-yaml
+LightingData.asset  binary
 
-# Unity UI Toolkit files
-*.tss                   text diff=css linguist-language=css
-*.uss                   text diff=css linguist-language=css
-*.uxml                  text linguist-language=xml linguist-detectable
+# 이미지
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.bmp   binary
+*.tga   binary
+*.tif   binary
+*.tiff  binary
+*.psd   binary
+*.webp  binary
+*.exr   binary
+*.hdr   binary
 
-# Unity YAML files
-*.anim                  unity-yaml
-*.asset                 unity-yaml
-*.brush                 unity-yaml
-*.controller            unity-yaml
-*.flare                 unity-yaml
-*.fontsettings          unity-yaml
-*.giparams              unity-yaml
-*.guiskin               unity-yaml
-*.lighting              unity-yaml
-*.mask                  unity-yaml
-*.mat                   unity-yaml
-*.meta                  unity-yaml
-*.mixer                 unity-yaml
-*.overrideController    unity-yaml
-*.playable              unity-yaml
-*.prefab                unity-yaml
-*.preset                unity-yaml
-*.renderTexture         unity-yaml
-*.scenetemplate         unity-yaml
-*.shadervariants        unity-yaml
-*.signal                unity-yaml
-*.spriteatlas           unity-yaml
-*.spriteatlasv2         unity-yaml
-*.terrainlayer          unity-yaml
-*.unity                 unity-yaml
+# 오디오, 영상
+*.wav   binary
+*.mp3   binary
+*.ogg   binary
+*.aif   binary
+*.aiff  binary
+*.mp4   binary
+*.mov   binary
+*.webm  binary
 
-# "physic" for 3D but "physics" for 2D
-*.physicMaterial        unity-yaml
-*.physicsMaterial2D     unity-yaml
-
-# Exclude from GitHub stats and diffs: third-party plugins, packages lock file
-Assets/Plugins/**           linguist-generated
-Packages/packages-lock.json linguist-generated
-
-# Unity LFS
-*.cubemap               lfs
-*.unitypackage          lfs
-
-# 3D models
-*.3dm                   lfs
-*.3ds                   lfs
-*.blend                 lfs
-*.blend1                lfs
-*.c4d                   lfs
-*.collada               lfs
-*.dae                   lfs
-*.dxf                   lfs
-*.FBX                   lfs
-*.fbx                   lfs
-*.jas                   lfs
-*.lws                   lfs
-*.lxo                   lfs
-*.ma                    lfs
-*.max                   lfs
-*.mb                    lfs
-*.obj                   lfs
-*.ply                   lfs
-*.skp                   lfs
-*.stl                   lfs
-*.ztl                   lfs
-
-# Audio
-*.aif                   lfs
-*.aiff                  lfs
-*.it                    lfs
-*.mod                   lfs
-*.mp3                   lfs
-*.ogg                   lfs
-*.s3m                   lfs
-*.wav                   lfs
-*.xm                    lfs
-
-# Video
-*.asf                   lfs
-*.avi                   lfs
-*.flv                   lfs
-*.mov                   lfs
-*.mp4                   lfs
-*.mpeg                  lfs
-*.mpg                   lfs
-*.ogv                   lfs
-*.wmv                   lfs
-
-# Images
-*.bmp                   lfs
-*.exr                   lfs
-*.gif                   lfs
-*.hdr                   lfs
-*.iff                   lfs
-*.jpeg                  lfs
-*.jpg                   lfs
-*.pict                  lfs
-*.png                   lfs
-*.psd                   lfs
-*.tga                   lfs
-*.tif                   lfs
-*.tiff                  lfs
-*.webp                  lfs
-
-# Compressed Archive
-*.7z                    lfs
-*.bz2                   lfs
-*.gz                    lfs
-*.rar                   lfs
-*.tar                   lfs
-*.zip                   lfs
-
-# Compiled Dynamic Library
-*.dll                   lfs
-*.pdb                   lfs
-*.so                    lfs
-
-# Fonts
-*.otf                   lfs
-*.ttf                   lfs
-
-# Executable/Installer
-*.apk                   lfs
-*.exe                   lfs
-
-# Documents
-*.pdf                   lfs
-
-# ETC
-*.a                     lfs
-*.reason                lfs
-*.rns                   lfs
-
-# Spine export file for Unity
-*.skel.bytes            lfs
-
-# Exceptions for .asset files such as lightning pre-baking
-LightingData.asset     binary
+# 폰트, 기타 바이너리
+*.ttf   binary
+*.otf   binary
+*.dll   binary
+*.zip   binary
+*.pdf   binary
+*.xlsx  binary
+*.unitypackage binary
