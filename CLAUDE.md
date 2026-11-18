@@ -36,6 +36,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | CSV 임포트 (탐색, 전투) | 자동 (`Data/Exploration_*.csv`, `Battle_*.csv`가 바뀌면). 수동: `Tools > Project Vita > CSV 임포트 (탐색, 전투)`. 없는 Yarn 노드, 중복 id, 없는 스킬/상태이상/유닛, 효과 문법, 조건식 오류를 행 번호와 함께 경고 |
 | 전투 시뮬레이터 | `Tools > Project Vita > 전투 시뮬레이터` (조우, 반복 횟수, 아군 AI 랜덤/탐욕 → 승률, 평균 라운드, 유닛별 피해, 스킬 빈도, CSV 저장). 코드에서는 `BattleSimulatorWindow.Simulate(...)` |
 | 탐색, 전투 예시 | 타이틀의 개발용 에피소드 선택에서 `[예시] 탐색 확인`(ExploreTest), `[예시] 전투 확인`(BattleTest). 대사는 `Dialogue/_Example/ExploreExample.yarn`, `BattleExample.yarn` |
+| 대사 테스트 러너 | `Tools > Project Vita > 대사 테스트 러너`. 노드를 누르면 그 노드부터 플레이한다 (변수는 비우고 창의 "시작 변수"를 넣음, 끝나면 원래 씬으로 돌아옴). "읽은 대사 기록 지우기" 버튼도 있다 |
+| 핫리로드 | 플레이 중에 `.yarn`을 저장하면 1~2초 뒤 지금 노드(탐색이면 장소나 지도)를 처음부터 다시 연다. 게임 안에서 F5도 같다 (개발 빌드) |
+| 세이브 파일 | `%USERPROFILE%/AppData/LocalLow/TeamVita/PROJECTVITA/`: `autosave.json`, `save_1~7.json`과 썸네일 `.png`, `read_lines.json`(읽은 대사). 지우면 처음 상태가 된다 |
 | 테스트 | 없음 |
 | 에디터 없이 컴파일 확인 | Unity가 만든 `Assembly-CSharp.csproj`는 `dotnet build`로 빌드된다. 새 `.cs`는 Unity가 csproj를 다시 만들기 전까지 빠져 있으니, 복사본 csproj에 `<Compile Include>`를 추가해서 확인한다 |
 
@@ -100,8 +103,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `GameVariables`: Yarn 변수 저장소를 `DontDestroyOnLoad`에 둔다. 씬을 다시 로드해도 변수가 유지되고, 타이틀에서 새로 시작할 때만 비운다.
   - `StoryPresenter` (`DialoguePresenterBase`): 이름표(캐릭터 색), 타이핑 효과(진행 중 클릭하면 끝까지 표시), 나레이션 모드(이름표 숨김, 본문 색), `#face:` 태그, 말하는 사람 강조, 선택지 (클릭 또는 숫자 키). 대사창과 무대의 `raycastTarget`은 꺼 둔다 (버튼 위 클릭만 넘기기에서 제외하려고). 노드에 들어갈 때 `NodeEntered` 이벤트를 낸다.
   - `StoryStage`: 무대 (배경 2장 크로스페이드, 스탠딩, CG, 비네트, 와이프, 플래시, 페이드, 흔들림). 세이브용 `GetState`/`ApplyState`.
-  - `SaveSystem`: 노드에 들어갈 때마다 `persistentDataPath/autosave.json`에 자동 저장 (에피소드, 노드, 변수, 무대, BGM). 타이틀의 이어하기는 그 노드 처음부터 다시 시작한다. 슬롯 UI는 4-7.
-  - `DevOverlay`: 에피소드, 노드, 최근 명령을 왼쪽 위에 표시한다. F1로 숨긴다. Development Build가 아니면 꺼진다.
+  - `SaveSystem`: 자동 저장(슬롯 0. 노드에 들어갈 때마다, 탐색은 장소에 들어갈 때, 지도, 조사 후)과 수동 슬롯 1~7(썸네일 PNG). 에피소드, 노드(또는 장소), 변수, 무대, BGM을 저장한다. 수동 저장은 마지막 자동 저장 시점(`LastSnapshot`)을 복사하므로, **불러오면 그 노드(장소)의 처음부터** 시작한다. 전투 중에는 저장할 수 없다.
+  - `EpisodeFlow.Resume(save)`: 이어하기, 슬롯 불러오기, 핫리로드가 모두 이 함수로 들어온다 (변수, 대사 기록, 스킵 초기화 후 씬 로드).
+  - `DevOverlay`: 에피소드, 노드, 최근 명령을 왼쪽 위에 표시한다. F1로 숨기고, 메뉴가 열려 있으면 저절로 숨는다(썸네일에도 안 찍힘). F5는 지금 노드 다시 시작. Development Build가 아니면 꺼진다.
+- **편의 기능** (4-7, `Scripts/Runtime/Story/`, `Menus/`)
+  - `DialogueModes`: 오토(A, 설정의 오토 속도), 스킵(Tab, **읽은 대사만**. 처음 보는 대사, 선택지, 대화 끝, 씬 전환에서 멈춤), 빨리감기(Ctrl 누르는 동안, 안 읽은 대사도. 선택지에서 멈춤). 스킵 중에는 `GamePause.SetSpeed(6)`으로 트윈과 `<<wait>>`도 빨라진다. 오토는 씬이 바뀌어도 유지, 타이틀에서 꺼짐.
+  - `ReadLines`: 읽은 줄 = Yarn 줄 id + 본문 해시. 작가가 대사를 고치면 그 줄은 다시 "안 읽음"이 된다. 게임 전체에 하나 (`read_lines.json`).
+  - `Backlog`(내용, 최근 300개, 씬이 바뀌어도 유지, 새 게임/불러오기에서 비움) + `BacklogPanel`(L, 휠 위로, 로그 버튼, 일시정지 메뉴의 "대사 기록"). 닫기: 오른쪽 클릭, L, Esc, 맨 아래에서 휠 아래로.
+  - `DialogueQuickMenu`: 대사창 오른쪽 위의 로그/오토/스킵 버튼과 단축키. 대사창의 자식이라 대사가 없으면 숨는다.
+  - `SaveSlotPanel` + `SaveSlotCard`: 타이틀의 불러오기, 일시정지의 저장/불러오기. 덮어쓰기와 게임 중 불러오기는 한 번 더 눌러야 실행된다. 썸네일은 일시정지 메뉴를 열기 직전에 `Core/ScreenThumbnail`로 찍는다 (0.3초 안에 못 찍으면 썸네일 없이 연다).
+  - `DialogueTest`: 노드 테스트(`Run`: 노드 이름으로 에피소드를 추측해서 그 씬에서 실행, 못 찾으면 임시 에피소드 `_NodeTest`로 Story 씬에서 실행하고 끝나면 타이틀)와 핫리로드(`ReloadCurrent`: `LastSnapshot`으로 `Resume`. 씬을 다시 로드하므로 새로 컴파일된 Yarn이 들어온다). 에디터 쪽은 `Editor/DialogueTestRunnerWindow`, `Editor/YarnProjectAutoRefresh`(플레이 중 `.yarn` 수정 시각을 1초마다 보고 직접 임포트 → Yarn 프로젝트가 다시 컴파일되면 게임에 알림).
+  - 일시정지 메뉴: 계속하기, 대사 기록(전투 씬에는 없음), 저장, 불러오기, 설정, 타이틀로, 게임 종료. Esc는 위에 열린 것부터 닫는다 (슬롯 → 설정 → 대사 기록 → 메뉴).
 - **공용** (`Scripts/Runtime/Core/`)
   - `CsvTable`: BOM, 따옴표, CRLF 처리, 4행부터 데이터. 4-5 임포터도 이것을 쓴다.
   - `AssetCatalog` (`Resources/AssetCatalog.asset`): 이름 → 그림/소리/캐릭터. `Editor/AssetCatalogBuilder`가 폴더를 감시해서 자동으로 채운다. 캐릭터 = `Data/Characters.csv` (`character_id, yarn_name, name_color`) + `Art/Characters/{id}/{id}_{표정}.png`.
@@ -136,7 +148,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Dynamic TMP 폰트 에셋은 플레이하는 동안 커진다. 커밋 전에 비우거나, Static 아틀라스(KS X 1001 2350자)로 굽는다.
 - 에디터 도구의 네임스페이스는 `.EditorTools`로 한다. `.Editor`로 끝나면 `: Editor`가 `UnityEditor.Editor` 대신 그 네임스페이스로 해석된다.
 - Unity YAML에서 한글 오브젝트 이름은 유니코드 이스케이프(`\uXXXX`)로 저장된다. 프리팹을 한글로 grep하면 찾지 못한다.
-- 사용자는 파섹으로 원격 접속한다. UI와 씬 구성은 손으로 하기보다 **에디터 스크립트로 생성**하는 쪽을 선호한다.
+- 사용자는 파섹으로 원격 접속한다. UI와 씬 구성은 **에디터 스크립트로 생성**하는 것을 기본으로 하되, 에디터에서 손으로 하는 편이 나으면 그렇게 해도 된다 (사용자가 2026-11-18 `01_프로젝트환경구축.md`에 메모).
+- 버튼을 클릭하면 EventSystem의 선택 상태로 남아서, 대사 넘기기(Space/Enter)가 그 버튼까지 누른다. 대사 중에 보이는 버튼은 누른 뒤 `EventSystem.current.SetSelectedGameObject(null)`을 한다 (`DialogueQuickMenu`).
 - **새 .yarn 파일은 Yarn Project에 저절로 안 들어간다** (Yarn Spinner 3.3.2. 기존 파일 수정은 반영됨). `Editor/YarnProjectAutoRefresh.cs`가 Dialogue 폴더의 .yarn 추가/삭제/이동 때 프로젝트를 다시 임포트한다.
 - ScriptableObject 클래스는 **클래스 이름과 같은 파일**에 둔다. 다른 파일에 있으면 에셋이 스크립트를 잃는다 (`m_Script: {fileID: 0}`).
 - `EditorApplication.delayCall`은 에디터에 포커스가 없으면 돌지 않을 때가 있다. 리소스 목록과 CSV 자동 갱신은 Unity로 돌아오면 돈다. 꼭 바로 해야 하는 것은 후처리기 안에서 직접 한다.
@@ -148,7 +161,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 에디터가 포커스를 잃으면 플레이 루프가 멈춘다 (`runInBackground` false). 플레이 중에 `Application.runInBackground = true`를 실행한다 (런타임 값이라 설정은 바뀌지 않는다).
   - 포커스가 없으면 Input System이 키와 마우스 입력(시뮬레이션 포함)을 게임에 보내지 않는다. 입력 확인은 사용자 플레이로 한다.
   - **`InputSystem.settings`를 런타임에 바꾸거나 새 인스턴스로 교체하지 않는다.** 도메인 리로드 뒤에도 Input System이 깨지고, 복구하면 장치 목록이 사라져서 에디터를 재시작해야 한다.
-  - `manage_camera` screenshot은 `Assets/Screenshots/`에 저장된다. 테스트 후 지운다.
+  - `manage_camera` screenshot은 `Assets/Screenshots/`에 저장된다. 테스트 후 지운다. `execute_code`는 `AssetDatabase.DeleteAsset`을 막으므로 파일 시스템에서 지우고 Refresh한다.
+  - 테스트로 만든 세이브 슬롯과 `read_lines.json`은 사용자 PC의 세이브 폴더에 남는다. 테스트 후 지운다.
+  - 플레이하면 Dynamic 폰트 에셋이 커진다. 테스트 후 `Dynamic 폰트 비우기` 메뉴를 실행한다.
 
 ## Conventions
 

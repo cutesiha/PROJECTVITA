@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace ProjectVita.Menus
 {
     /// <summary>
-    /// 타이틀: 처음부터, 이어하기, 설정, 종료, 에피소드 선택(개발용).
+    /// 타이틀: 처음부터, 이어하기(자동 저장), 불러오기(슬롯), 설정, 종료, 에피소드 선택(개발용).
     /// 에피소드 버튼은 Episodes.csv의 행마다 실행 중에 만든다. CSV에 행을 추가하면 버튼도 늘어난다.
     /// </summary>
     public sealed class TitleMenu : MonoBehaviour
@@ -16,9 +16,11 @@ namespace ProjectVita.Menus
         [SerializeField] TextAsset episodesCsv;
         [SerializeField] Button startButton;
         [SerializeField] Button continueButton;
+        [SerializeField] Button loadButton;
         [SerializeField] Button settingsButton;
         [SerializeField] Button quitButton;
         [SerializeField] SettingsPanel settings;
+        [SerializeField] SaveSlotPanel slots;
 
         [Header("에피소드 선택 (Development Build에서만 보인다)")]
         [SerializeField] GameObject episodePanel;
@@ -37,6 +39,8 @@ namespace ProjectVita.Menus
             startButton.onClick.AddListener(() => EpisodeFlow.StartNewGame(first.Id));
             continueButton.interactable = SaveSystem.HasAutoSave;
             continueButton.onClick.AddListener(() => EpisodeFlow.Continue());
+            loadButton.interactable = SaveSystem.HasAnySave;
+            loadButton.onClick.AddListener(() => slots.Open(SaveSlotPanel.Mode.Load, false, null));
             settingsButton.onClick.AddListener(() => settings.Open());
             quitButton.onClick.AddListener(QuitGame.Quit);
 
@@ -59,7 +63,9 @@ namespace ProjectVita.Menus
         void Update()
         {
             var kb = Keyboard.current;
-            if (kb != null && kb.escapeKey.wasPressedThisFrame && settings.IsOpen) settings.Close();
+            if (kb == null || !kb.escapeKey.wasPressedThisFrame) return;
+            if (slots.IsOpen) slots.Close();
+            else if (settings.IsOpen) settings.Close();
         }
     }
 }

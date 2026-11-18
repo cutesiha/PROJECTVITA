@@ -18,6 +18,7 @@ namespace ProjectVita.Story
         [SerializeField] TMP_Text text;
 
         static DevOverlay instance;
+        static bool hiddenByUser;
         static string episode = "-";
         static string node = "-";
         static string status = "";
@@ -27,6 +28,7 @@ namespace ProjectVita.Story
         static void ResetStatics()
         {
             instance = null;
+            hiddenByUser = false;
             episode = "-";
             node = "-";
             status = "";
@@ -48,8 +50,20 @@ namespace ProjectVita.Story
         void Update()
         {
             var kb = Keyboard.current;
-            if (kb != null && kb.f1Key.wasPressedThisFrame && text != null)
-                text.enabled = !text.enabled;
+            if (kb == null) return;
+            if (kb.f1Key.wasPressedThisFrame) hiddenByUser = !hiddenByUser;
+            // F5: 지금 노드(탐색이면 장소)를 처음부터 다시 연다. .yarn을 고친 뒤 바로 확인할 때 쓴다.
+            if (kb.f5Key.wasPressedThisFrame)
+                DialogueTest.ReloadCurrent("F5");
+        }
+
+        // 메뉴(일시정지, 대사 기록, 슬롯)가 열려 있으면 숨는다. 메뉴 제목과 겹치지 않고, 세이브 썸네일에도 찍히지 않는다.
+        // LateUpdate라서 메뉴를 연 프레임의 화면 캡처(프레임 끝) 전에 숨는다.
+        void LateUpdate()
+        {
+            if (text == null) return;
+            bool show = !hiddenByUser && !ProjectVita.Core.GamePause.IsPaused;
+            if (text.enabled != show) text.enabled = show;
         }
 
         public static void SetEpisode(Episode ep)
@@ -84,7 +98,7 @@ namespace ProjectVita.Story
         {
             if (instance == null || instance.text == null) return;
             var sb = new StringBuilder();
-            sb.Append("<b>[DEV]</b> F1 숨기기\n");
+            sb.Append("<b>[DEV]</b> F1 숨기기 · F5 노드 다시 시작\n");
             sb.Append("에피소드: ").Append(episode).Append('\n');
             sb.Append("노드: ").Append(node).Append('\n');
             if (!string.IsNullOrEmpty(status)) sb.Append("<color=#FF6B6B><noparse>").Append(status).Append("</noparse></color>\n");

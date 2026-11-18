@@ -52,7 +52,8 @@ namespace ProjectVita.Story
         static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             IsLoading = false;
-            GamePause.Set(false);
+            GamePause.ResetAll();
+            DialogueModes.SetSkip(false); // 스킵은 씬이 바뀌면 멈춘다. 오토는 유지한다.
             Tween.Forget(ScreenFader.Instance.FadeIn());
         }
 
@@ -70,26 +71,28 @@ namespace ProjectVita.Story
         public static bool StartNewGame(string episodeId)
         {
             if (IsLoading) return false;
-            GameVariables.Clear();
-            pendingResume = null;
-            pendingNode = pendingLocation = pendingEncounter = null;
+            ResetSession();
             return TryGo(episodeId);
         }
 
-        /// <summary>자동 저장에서 이어한다. 변수를 되돌리고, 저장한 곳(이야기 노드 또는 탐색 장소)부터 시작한다.</summary>
-        public static bool Continue()
+        /// <summary>자동 저장에서 이어한다.</summary>
+        public static bool Continue() => Resume(SaveSystem.LoadAutoSave());
+
+        /// <summary>
+        /// 세이브(슬롯, 자동 저장, 핫리로드 스냅숏)에서 시작한다. 변수를 되돌리고, 저장한 곳(이야기 노드 또는 탐색 장소)부터 시작한다.
+        /// </summary>
+        public static bool Resume(SaveSystem.SaveData data)
         {
-            if (IsLoading) return false;
-            var data = SaveSystem.LoadAutoSave();
-            if (data == null) return false;
+            if (IsLoading || data == null) return false;
             var episode = Table?.Find(data.episodeId);
             if (episode == null)
             {
                 Debug.LogError($"[Episode] 세이브의 에피소드 '{data.episodeId}'가 Episodes.csv에 없다.");
                 return false;
             }
-            GameVariables.Clear();
+            ResetSession();
             SaveSystem.RestoreVariables(data);
+            SaveSystem.SetSnapshot(data);
             pendingResume = data;
 
             if (data.scene == ExplorationSceneName)
@@ -100,6 +103,34 @@ namespace ProjectVita.Story
                 return true;
             }
             return TryGo(data.episodeId);
+        }
+
+        /// <summary>
+        /// 대사 테스트: 에피소드 씬을 열고 start_node 대신 node부터 실행한다. 변수는 호출하는 쪽에서 준비한다.
+        /// </summary>
+        public static bool StartAtNode(Episode episode, string node)
+        {
+            if (IsLoading || episode == null) return false;
+            Backlog.Clear();
+            SaveSystem.ClearSnapshot();
+            pendingResume = null;
+            pendingLocation = pendingEncounter = null;
+            if (!LoadScene(episode.SceneName)) return false;
+            Current = episode;
+            pendingNode = node;
+            Debug.Log($"[Episode] 테스트 → {node} (에피소드 {episode.Id}, 씬 {episode.SceneName})");
+            return true;
+        }
+
+        /// <summary>새 게임이나 불러오기 전에: 변수, 대사 기록, 스킵, 대기 중인 값을 비운다.</summary>
+        static void ResetSession()
+        {
+            GameVariables.Clear();
+            Backlog.Clear();
+            DialogueModes.SetSkip(false);
+            SaveSystem.ClearSnapshot();
+            pendingResume = null;
+            pendingNode = pendingLocation = pendingEncounter = null;
         }
 
         // ------------------------------------------------------------ 탐색, 전투
@@ -185,6 +216,8 @@ namespace ProjectVita.Story
             if (LoadScene(TitleSceneName))
             {
                 Current = null;
+                DialogueModes.StopAll();
+                SaveSystem.ClearSnapshot();
                 Debug.Log("[Episode] → 타이틀");
             }
         }

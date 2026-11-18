@@ -46,6 +46,17 @@ namespace ProjectVita.Story
             return ep;
         }
 
+        /// <summary>
+        /// 표에 없는 임시 에피소드를 이번 실행 동안만 등록한다 (대사 테스트용). 타이틀의 에피소드 목록에는 나오지 않는다.
+        /// </summary>
+        public Episode RegisterTemporary(string id, string displayName, string sceneName)
+        {
+            if (byId.TryGetValue(id, out var existing)) return existing;
+            var ep = new Episode { Id = id, DisplayName = displayName, UnityScene = sceneName, StartNode = "", NextEpisode = "", LineNumber = 0 };
+            byId.Add(id, ep);
+            return ep;
+        }
+
         public static EpisodeTable Parse(TextAsset csv)
         {
             var table = new EpisodeTable();

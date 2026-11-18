@@ -17,6 +17,7 @@ namespace ProjectVita.Story
     /// - 타이핑 효과: 진행 중에 클릭하면 끝까지 바로 보이고, 한 번 더 누르면 다음 줄
     /// - 대사 끝의 #face:표정 태그를 화자 스탠딩에 적용, 말하는 사람만 밝게
     /// - 선택지: 클릭 또는 숫자 키
+    /// - 4-7: 대사 기록(Backlog), 읽은 대사 기록(ReadLines), 오토/스킵/빨리감기(DialogueModes)
     /// 일시정지(메뉴) 중에는 입력을 받지 않는다.
     /// </summary>
     public sealed class StoryPresenter : DialoguePresenterBase
@@ -63,7 +64,13 @@ namespace ProjectVita.Story
             // 다음 표시가 위아래로 살짝 움직인다.
             if (nextIndicator != null && nextIndicator.gameObject.activeSelf)
                 nextIndicator.anchoredPosition = indicatorBase + new Vector2(0f, Mathf.Sin(Time.unscaledTime * 6f) * 5f);
+
+            // 스킵, 빨리감기 중에는 연출(트윈, <<wait>>)도 빠르게 돌린다. 대사창이 떠 있을 때만.
+            bool fast = dialogueBox != null && dialogueBox.activeSelf && DialogueModes.Skipping;
+            GamePause.SetSpeed(fast ? DialogueModes.SkipTimeScale : 1f);
         }
+
+        void OnDisable() => GamePause.SetSpeed(1f);
 
         // ------------------------------------------------------------ 대화 시작과 끝
 
@@ -80,6 +87,8 @@ namespace ProjectVita.Story
 
         public override YarnTask OnDialogueCompleteAsync(CancellationToken token)
         {
+            // 대화가 끝나면 스킵을 멈춘다 (탐색으로 돌아갔을 때 다음 대화까지 스킵이 이어지지 않게).
+            DialogueModes.SetSkip(false);
             // 씬 전환으로 이미 파괴됐을 수 있다.
             if (this != null)
             {
@@ -117,27 +126,40 @@ namespace ProjectVita.Story
                 stage.Highlight(narration ? null : speaker);
             }
 
+            var nameColor = character != null ? character.nameColor : defaultNameColor;
+            string text = line.TextWithoutCharacterName.Text;
             namePlate.SetActive(!narration);
             nameText.text = narration ? string.Empty : speaker;
-            if (namePlateImage != null) namePlateImage.color = character != null ? character.nameColor : defaultNameColor;
+            if (namePlateImage != null) namePlateImage.color = nameColor;
             bodyText.color = narration ? narrationColor : speechColor;
-            bodyText.text = line.TextWithoutCharacterName.Text;
+            bodyText.text = text;
             nextIndicator.gameObject.SetActive(false);
 
-            await TypeText(token);
+            // 읽은 대사 기록과 대사 기록
+            string key = ReadLines.KeyOf(line);
+            bool wasRead = ReadLines.IsRead(key);
+            ReadLines.Mark(key);
+            Backlog.AddLine(narration ? null : speaker, text, nameColor);
+
+            // 스킵은 읽은 대사만 넘긴다. 처음 보는 대사에서 멈춘다 (Ctrl 빨리감기는 계속 넘긴다).
+            if (DialogueModes.Skip && !wasRead && !DialogueModes.FastForwardHeld) DialogueModes.SetSkip(false);
+
+            bodyText.ForceMeshUpdate();
+            int total = bodyText.textInfo.characterCount;
+
+            if (DialogueModes.Skipping) bodyText.maxVisibleCharacters = int.MaxValue;
+            else await TypeText(total, token);
             if (this == null || token.IsNextContentRequested) return;
 
             nextIndicator.gameObject.SetActive(true);
-            await WaitForAdvance(token.NextContentToken);
+            await WaitForAdvance(token.NextContentToken, total);
             if (this != null) nextIndicator.gameObject.SetActive(false);
             // 본문은 지우지 않는다. 다음이 선택지면 질문 대사가 화면에 남아 있어야 한다.
         }
 
-        /// <summary>글자를 하나씩 보여 준다. 진행 중에 넘기기 입력이 오면 끝까지 바로 보여 준다.</summary>
-        async YarnTask TypeText(LineCancellationToken token)
+        /// <summary>글자를 하나씩 보여 준다. 진행 중에 넘기기 입력이 오거나 스킵이 켜지면 끝까지 바로 보여 준다.</summary>
+        async YarnTask TypeText(int total, LineCancellationToken token)
         {
-            bodyText.ForceMeshUpdate();
-            int total = bodyText.textInfo.characterCount;
             float cps = GameSettings.CharsPerSecond;
 
             if (float.IsInfinity(cps) || total == 0)
@@ -152,7 +174,7 @@ namespace ProjectVita.Story
             await YarnTask.Yield();
             while (this != null && !token.IsNextContentRequested)
             {
-                if (token.IsHurryUpRequested || AdvancePressed()) break;
+                if (token.IsHurryUpRequested || AdvancePressed() || DialogueModes.Skipping) break;
                 shown += cps * Time.deltaTime; // 일시정지 중에는 deltaTime이 0이라 멈춘다
                 bodyText.maxVisibleCharacters = Mathf.Min(total, (int)shown);
                 if (shown >= total) break;
@@ -161,13 +183,38 @@ namespace ProjectVita.Story
             if (this != null) bodyText.maxVisibleCharacters = int.MaxValue;
         }
 
-        async YarnTask WaitForAdvance(CancellationToken token)
+        /// <summary>
+        /// 다음 줄로 넘어갈 때까지 기다린다: 넘기기 입력, 스킵/빨리감기(짧게 보여 주고), 오토(글자 수에 맞춰 기다리고).
+        /// 시간은 실제 시간으로 세고, 메뉴가 열려 있는 동안은 세지 않는다.
+        /// </summary>
+        async YarnTask WaitForAdvance(CancellationToken token, int characters)
         {
             // 타이핑을 끝낸 입력이 그대로 다음 줄까지 넘기지 않게 한 프레임 쉰다.
             await YarnTask.Yield();
+            float skipTimer = 0f, autoTimer = 0f;
+            float autoDelay = GameSettings.AutoDelay(characters);
             while (this != null && !token.IsCancellationRequested)
             {
-                if (AdvancePressed()) return;
+                if (AdvancePressed())
+                {
+                    // 스킵 중에 누르면 스킵을 멈춘다.
+                    DialogueModes.SetSkip(false);
+                    return;
+                }
+                if (!GamePause.IsPaused)
+                {
+                    float dt = Time.unscaledDeltaTime;
+                    if (DialogueModes.Skipping)
+                    {
+                        skipTimer += dt;
+                        if (skipTimer >= DialogueModes.SkipLineSeconds) return;
+                    }
+                    else if (DialogueModes.Auto)
+                    {
+                        autoTimer += dt;
+                        if (autoTimer >= autoDelay) return;
+                    }
+                }
                 await YarnTask.Yield();
             }
         }
@@ -210,6 +257,8 @@ namespace ProjectVita.Story
         {
             ClearOptions();
             nextIndicator.gameObject.SetActive(false);
+            // 스킵은 선택지에서 멈춘다.
+            DialogueModes.SetSkip(false);
 
             var shown = new List<DialogueOption>();
             DialogueOption selected = null;
@@ -245,6 +294,7 @@ namespace ProjectVita.Story
             }
 
             if (this != null) ClearOptions();
+            if (selected != null) Backlog.AddChoice(selected.Line.TextWithoutCharacterName.Text);
             return selected;
         }
 

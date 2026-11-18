@@ -30,6 +30,9 @@ namespace ProjectVita.Story
         {
             var table = EpisodeFlow.EnsureTable(episodesCsv);
 
+            // 에디터의 대사 테스트 러너가 노드를 골라 플레이를 시작했으면 그 노드로 다시 연다.
+            if (DialogueTest.TryRunEditorRequest()) return;
+
             episode = EpisodeFlow.Current;
             if (episode == null)
             {
@@ -44,7 +47,7 @@ namespace ProjectVita.Story
             }
             DevOverlay.SetEpisode(episode);
 
-            if (!CanRun(episode.StartNode)) return;
+            if (!CanRun()) return;
 
             string startNode = episode.StartNode;
             var resume = EpisodeFlow.TakePendingResume(episode.Id);
@@ -57,12 +60,18 @@ namespace ProjectVita.Story
                 Debug.Log($"[Story] 이어하기: {episode.Id} / {startNode} (저장 {resume.savedAt})");
             }
 
-            // 전투에서 돌아왔으면 승리/패배 노드부터 시작한다.
+            // 전투에서 돌아왔으면 승리/패배 노드부터, 대사 테스트면 고른 노드부터 시작한다.
             string pendingNode = EpisodeFlow.TakePendingNode();
             if (!string.IsNullOrEmpty(pendingNode))
             {
                 if (HasNode(pendingNode)) startNode = pendingNode;
-                else Fail($"전투 결과 노드 '{pendingNode}'가 Yarn에 없다 (Battle_Encounter.csv 확인).");
+                else Fail($"시작할 노드 '{pendingNode}'가 Yarn에 없다 (전투 결과면 Battle_Encounter.csv 확인).");
+            }
+
+            if (!HasNode(startNode))
+            {
+                Fail($"start_node '{startNode}' 노드가 Yarn에 없다 (Episodes.csv {episode.LineNumber}행, 에피소드 {episode.Id}).");
+                return;
             }
 
             // 변수는 씬 밖 저장소에 둔다. Dialogue가 처음 만들어지기(RunDialogue) 전에 바꿔야 한다.
@@ -102,7 +111,7 @@ namespace ProjectVita.Story
             SaveSystem.AutoSave(episode.Id, nodeName, stage != null ? stage.GetState() : null, AudioManager.Instance.CurrentBgm);
         }
 
-        bool CanRun(string startNode)
+        bool CanRun()
         {
             if (runner == null)
                 return Fail("StoryDirector에 DialogueRunner가 연결되지 않았다. 씬 생성 메뉴를 다시 실행한다.");
@@ -113,9 +122,6 @@ namespace ProjectVita.Story
 
             if (project.Program == null)
                 return Fail("Yarn 스크립트에 오류가 있어서 컴파일되지 않았다. Console에서 .yarn 오류를 확인한다.");
-
-            if (!HasNode(startNode))
-                return Fail($"start_node '{startNode}' 노드가 Yarn에 없다 (Episodes.csv {episode.LineNumber}행, 에피소드 {episode.Id}).");
 
             return true;
         }

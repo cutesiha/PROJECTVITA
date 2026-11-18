@@ -188,6 +188,23 @@ namespace ProjectVita.EditorTools
             SetRect(next.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(0.5f, 0.5f), new Vector2(-46, 40), new Vector2(18, 18));
             next.rectTransform.localRotation = Quaternion.Euler(0, 0, 45);
 
+            // ---- 로그 / 오토 / 스킵 (대사창 오른쪽 위, 대사창의 자식이라 대사창과 같이 보이고 숨는다)
+            var quick = CreateRect("QuickMenu", boxRt);
+            SetRect(quick, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(-36, 10), new Vector2(384, 44));
+            var quickLayout = quick.gameObject.AddComponent<HorizontalLayoutGroup>();
+            quickLayout.spacing = 10;
+            quickLayout.childControlWidth = true;
+            quickLayout.childControlHeight = true;
+            quickLayout.childForceExpandWidth = true;
+            quickLayout.childForceExpandHeight = true;
+            var logButton = CreateButton("LogButton", quick, "로그", 20, 0, skew: 12f);
+            var autoButton = CreateButton("AutoButton", quick, "오토", 20, 0, skew: 12f);
+            var skipButton = CreateButton("SkipButton", quick, "스킵", 20, 0, skew: 12f);
+            var quickMenu = quick.gameObject.AddComponent<DialogueQuickMenu>();
+            SetField(quickMenu, "logButton", logButton);
+            SetField(quickMenu, "autoButton", autoButton);
+            SetField(quickMenu, "skipButton", skipButton);
+
             // ---- 선택지
             var options = CreateRect("Options", canvas.transform);
             SetRect(options, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 120), new Vector2(960, 0));
@@ -221,7 +238,8 @@ namespace ProjectVita.EditorTools
             SetField(stage, "flash", flash);
             SetField(stage, "fadeOverlay", fade);
 
-            CreatePauseCanvas(menuButton);
+            var backlog = CreatePauseCanvas(menuButton, withBacklog: true);
+            SetField(quickMenu, "backlog", backlog);
             CreateDevCanvas();
 
             // ---- 대화 시스템 (Runner + Presenter)
@@ -251,29 +269,173 @@ namespace ProjectVita.EditorTools
             return new DialogueScene { scene = scene, canvas = canvas, stage = stage, runner = runner, system = system, dialogueBox = boxRt };
         }
 
-        static void CreatePauseCanvas(Button menuButton)
+        /// <summary>일시정지 메뉴와 그 위에 뜨는 화면들(대사 기록, 세이브 슬롯, 설정). 대사 기록을 만들었으면 돌려준다.</summary>
+        static BacklogPanel CreatePauseCanvas(Button menuButton, bool withBacklog)
         {
             var pauseCanvas = CreateCanvas("PauseCanvas", 50);
             var pausePanel = CreateImage("PausePanel", pauseCanvas.transform, new Color(0, 0, 0, 0.78f), raycast: true);
             Stretch(pausePanel.rectTransform);
             var pauseTitle = CreateText("Title", pausePanel.transform, "일시정지", 60, ColText, TextAlignmentOptions.Center);
             pauseTitle.fontStyle = FontStyles.Bold;
-            SetRect(pauseTitle.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 310), new Vector2(800, 90));
-            var pauseList = CreateVerticalList("Buttons", pausePanel.transform, new Vector2(0, 50), 440);
-            var resumeButton = CreateButton("ResumeButton", pauseList, "계속하기", 34, 84);
-            var settingsButton = CreateButton("SettingsButton", pauseList, "설정", 34, 84);
-            var titleButton = CreateButton("TitleButton", pauseList, "타이틀로", 34, 84);
-            var quitButton = CreateButton("QuitButton", pauseList, "게임 종료", 34, 84);
+            SetRect(pauseTitle.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 370), new Vector2(800, 90));
+            var pauseList = CreateVerticalList("Buttons", pausePanel.transform, new Vector2(0, -30), 440);
+            var resumeButton = CreateButton("ResumeButton", pauseList, "계속하기", 32, 72);
+            var backlogButton = withBacklog ? CreateButton("BacklogButton", pauseList, "대사 기록", 32, 72) : null;
+            var saveButton = CreateButton("SaveButton", pauseList, "저장", 32, 72);
+            var loadButton = CreateButton("LoadButton", pauseList, "불러오기", 32, 72);
+            var settingsButton = CreateButton("SettingsButton", pauseList, "설정", 32, 72);
+            var titleButton = CreateButton("TitleButton", pauseList, "타이틀로", 32, 72);
+            var quitButton = CreateButton("QuitButton", pauseList, "게임 종료", 32, 72);
+
+            // 그리는 순서 = 만든 순서. 메뉴 위에 대사 기록, 슬롯, 설정이 뜬다.
+            var backlog = withBacklog ? CreateBacklogPanel(pauseCanvas) : null;
+            var slots = CreateSaveSlotPanel(pauseCanvas);
             var settings = CreateSettingsPanel(pauseCanvas);
 
             var pause = pauseCanvas.gameObject.AddComponent<PauseMenu>();
             SetField(pause, "panel", pausePanel.gameObject);
             SetField(pause, "openButton", menuButton);
             SetField(pause, "resumeButton", resumeButton);
+            SetField(pause, "backlogButton", backlogButton);
+            SetField(pause, "saveButton", saveButton);
+            SetField(pause, "loadButton", loadButton);
             SetField(pause, "settingsButton", settingsButton);
             SetField(pause, "titleButton", titleButton);
             SetField(pause, "quitButton", quitButton);
             SetField(pause, "settings", settings);
+            SetField(pause, "slots", slots);
+            SetField(pause, "backlog", backlog);
+            return backlog;
+        }
+
+        // ================================================================ 대사 기록 (4-7)
+
+        static BacklogPanel CreateBacklogPanel(Canvas canvas)
+        {
+            var root = CreateImage("BacklogPanel", canvas.transform, new Color(0.02f, 0.02f, 0.03f, 0.975f), raycast: true);
+            Stretch(root.rectTransform);
+            var band = CreateImage("AccentBand", root.transform, ColAccent);
+            band.gameObject.AddComponent<UISkew>().Skew = 120f;
+            SetRect(band.rectTransform, new Vector2(0, 0), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(60, 0), new Vector2(26, 0));
+            var title = CreateText("Title", root.transform, "대사 기록", 52, ColText, TextAlignmentOptions.Left);
+            title.fontStyle = FontStyles.Bold;
+            SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(170, -48), new Vector2(600, 80));
+            var hint = CreateText("Hint", root.transform, "휠 · 드래그: 스크롤     오른쪽 클릭 · L · Esc · 맨 아래에서 휠 아래로: 닫기", 24, ColSubText, TextAlignmentOptions.Left);
+            SetRect(hint.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(176, -128), new Vector2(1300, 40));
+            var close = CreateButton("CloseButton", root.transform, "닫기", 28, 0, skew: 16f);
+            SetRect((RectTransform)close.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-60, -50), new Vector2(200, 64));
+
+            // 스크롤 영역
+            var area = CreateRect("Scroll", root.transform);
+            Stretch(area);
+            area.offsetMin = new Vector2(170, 50);
+            area.offsetMax = new Vector2(-170, -190);
+            var scroll = area.gameObject.AddComponent<ScrollRect>();
+            var viewport = CreateImage("Viewport", area, Color.clear, raycast: true); // 휠과 드래그를 받으려면 레이캐스트 대상이 있어야 한다
+            Stretch(viewport.rectTransform);
+            viewport.rectTransform.offsetMax = new Vector2(-34, 0);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var content = CreateRect("Content", viewport.transform);
+            content.anchorMin = new Vector2(0, 1);
+            content.anchorMax = new Vector2(1, 1);
+            content.pivot = new Vector2(0.5f, 1);
+            content.offsetMin = content.offsetMax = Vector2.zero;
+            var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 30;
+            layout.padding = new RectOffset(10, 10, 10, 40);
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var entry = CreateText("EntryTemplate", content, "이름\n대사", 32, ColText, TextAlignmentOptions.TopLeft);
+            entry.lineSpacing = 10;
+
+            var barGo = DefaultControls.CreateScrollbar(new DefaultControls.Resources());
+            barGo.name = "Scrollbar";
+            SetLayerRecursive(barGo, LayerMask.NameToLayer("UI"));
+            barGo.transform.SetParent(area, false);
+            SetRect((RectTransform)barGo.transform, new Vector2(1, 0), new Vector2(1, 1), new Vector2(1, 0.5f), Vector2.zero, new Vector2(12, 0));
+            var bar = barGo.GetComponent<Scrollbar>();
+            bar.direction = Scrollbar.Direction.BottomToTop;
+            barGo.GetComponent<Image>().color = Hex("#2B2F38");
+            bar.targetGraphic.color = ColAccent;
+
+            scroll.content = content;
+            scroll.viewport = viewport.rectTransform;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 60;
+            scroll.verticalScrollbar = bar;
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+
+            var panel = canvas.gameObject.AddComponent<BacklogPanel>();
+            SetField(panel, "root", root.gameObject);
+            SetField(panel, "scroll", scroll);
+            SetField(panel, "content", content);
+            SetField(panel, "entryTemplate", entry);
+            SetField(panel, "closeButton", close);
+            return panel;
+        }
+
+        // ================================================================ 세이브 슬롯 (4-7, 타이틀과 일시정지 공용)
+
+        static SaveSlotPanel CreateSaveSlotPanel(Canvas canvas)
+        {
+            var root = CreateImage("SaveSlotPanel", canvas.transform, new Color(0, 0, 0, 0.85f), raycast: true);
+            Stretch(root.rectTransform);
+            var window = CreateImage("Window", root.transform, ColPanel, raycast: true);
+            SetRect(window.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1720, 960));
+            var accent = CreateImage("AccentLine", window.transform, ColAccent);
+            SetRect(accent.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(0, 6));
+
+            var title = CreateText("Title", window.transform, "저장", 48, ColText, TextAlignmentOptions.Left);
+            title.fontStyle = FontStyles.Bold;
+            SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(60, -36), new Vector2(500, 70));
+            var hint = CreateText("Hint", window.transform, "", 24, ColSubText, TextAlignmentOptions.Left);
+            SetRect(hint.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(60, -106), new Vector2(1300, 40));
+            var close = CreateButton("CloseButton", window.transform, "닫기", 28, 0, skew: 16f);
+            SetRect((RectTransform)close.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-50, -40), new Vector2(200, 64));
+
+            // 2열 x 4행 = 자동 저장 + 슬롯 7개
+            var grid = CreateRect("Grid", window.transform);
+            SetRect(grid, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(60, -170), new Vector2(1600, 760));
+            var gridLayout = grid.gameObject.AddComponent<GridLayoutGroup>();
+            gridLayout.cellSize = new Vector2(784, 172);
+            gridLayout.spacing = new Vector2(32, 24);
+            gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            gridLayout.constraintCount = 2;
+
+            var cardButton = CreateButton("SlotTemplate", grid, "슬롯", 28, 0);
+            var cardTitle = cardButton.GetComponentInChildren<TMP_Text>();
+            cardTitle.name = "Title";
+            cardTitle.alignment = TextAlignmentOptions.TopLeft;
+            SetRect(cardTitle.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(292, -16), new Vector2(470, 40));
+            var thumb = CreateRect("Thumbnail", cardButton.transform).gameObject.AddComponent<RawImage>();
+            thumb.raycastTarget = false;
+            SetRect(thumb.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(16, 0), new Vector2(256, 144));
+            var thumbLabel = CreateText("ThumbnailLabel", thumb.transform, "", 22, ColSubText, TextAlignmentOptions.Center);
+            Stretch(thumbLabel.rectTransform);
+            var info = CreateText("Info", cardButton.transform, "", 22, ColText, TextAlignmentOptions.TopLeft);
+            info.overflowMode = TextOverflowModes.Ellipsis;
+            info.lineSpacing = 4;
+            SetRect(info.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(292, -58), new Vector2(470, 104));
+            var card = cardButton.gameObject.AddComponent<SaveSlotCard>();
+            SetField(card, "button", cardButton);
+            SetField(card, "thumbnail", thumb);
+            SetField(card, "thumbnailLabel", thumbLabel);
+            SetField(card, "title", cardTitle);
+            SetField(card, "info", info);
+
+            var panel = canvas.gameObject.AddComponent<SaveSlotPanel>();
+            SetField(panel, "root", root.gameObject);
+            SetField(panel, "titleText", title);
+            SetField(panel, "hintText", hint);
+            SetField(panel, "grid", grid);
+            SetField(panel, "cardTemplate", card);
+            SetField(panel, "closeButton", close);
+            return panel;
         }
 
         static void CreateDevCanvas()
@@ -437,7 +599,7 @@ namespace ProjectVita.EditorTools
             var flash = CreateImage("Flash", canvas.transform, Color.white);
             Stretch(flash.rectTransform);
 
-            CreatePauseCanvas(menuButton);
+            CreatePauseCanvas(menuButton, withBacklog: false);
 
             var controller = canvas.gameObject.AddComponent<BattleController>();
             SetField(controller, "episodesCsv", episodesCsv);
@@ -562,12 +724,14 @@ namespace ProjectVita.EditorTools
             menu.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             var startButton = CreateButton("StartButton", menu, "처음부터", 36, 84, skew: 22f);
             var continueButton = CreateButton("ContinueButton", menu, "이어하기", 36, 84, skew: 22f);
+            var loadButton = CreateButton("LoadButton", menu, "불러오기", 36, 84, skew: 22f);
             var settingsButton = CreateButton("SettingsButton", menu, "설정", 36, 84, skew: 22f);
             var quitButton = CreateButton("QuitButton", menu, "종료", 36, 84, skew: 22f);
 
             var hint = CreateText("ControlsHint", canvas.transform,
-                "클릭 / Space / Enter: 대사 넘기기    숫자 키: 선택지    Esc: 메뉴    F1: 개발 정보 숨기기", 22, ColSubText, TextAlignmentOptions.BottomLeft);
-            SetRect(hint.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(170, 32), new Vector2(1400, 40));
+                "클릭 / Space / Enter: 넘기기    숫자 키: 선택지    L, 휠 위로: 대사 기록    A: 오토    Tab: 스킵(읽은 대사)    Ctrl: 빨리감기    Esc: 메뉴\n" +
+                "<size=90%>개발용    F1: 개발 정보 숨기기    F5: 지금 노드 다시 시작</size>", 22, ColSubText, TextAlignmentOptions.BottomLeft);
+            SetRect(hint.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(170, 28), new Vector2(1180, 70));
 
             // ---- 에피소드 선택 (개발용)
             var panel = CreateImage("EpisodePanel", canvas.transform, new Color(1, 1, 1, 0.02f));
@@ -596,15 +760,18 @@ namespace ProjectVita.EditorTools
 
             // ---- 설정
             var overlayCanvas = CreateCanvas("OverlayCanvas", 50);
+            var slots = CreateSaveSlotPanel(overlayCanvas);
             var settings = CreateSettingsPanel(overlayCanvas);
 
             var menuComp = canvas.gameObject.AddComponent<TitleMenu>();
             SetField(menuComp, "episodesCsv", episodesCsv);
             SetField(menuComp, "startButton", startButton);
             SetField(menuComp, "continueButton", continueButton);
+            SetField(menuComp, "loadButton", loadButton);
             SetField(menuComp, "settingsButton", settingsButton);
             SetField(menuComp, "quitButton", quitButton);
             SetField(menuComp, "settings", settings);
+            SetField(menuComp, "slots", slots);
             SetField(menuComp, "episodePanel", panel.gameObject);
             SetField(menuComp, "episodeListRoot", list);
             SetField(menuComp, "episodeButtonTemplate", episodeTemplate);
@@ -622,7 +789,7 @@ namespace ProjectVita.EditorTools
             Stretch(root.rectTransform);
 
             var window = CreateImage("Window", root.transform, ColPanel, raycast: true);
-            SetRect(window.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(980, 640));
+            SetRect(window.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(980, 720));
             var accent = CreateImage("AccentLine", window.transform, ColAccent);
             SetRect(accent.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(0, 6));
 
@@ -630,12 +797,13 @@ namespace ProjectVita.EditorTools
             title.fontStyle = FontStyles.Bold;
             SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(60, -40), new Vector2(600, 70));
 
-            var (bgmSlider, bgmValue) = CreateSliderRow(window.transform, "BGM 음량", -160);
-            var (sfxSlider, sfxValue) = CreateSliderRow(window.transform, "효과음 음량", -250);
-            var (speedSlider, speedValue) = CreateSliderRow(window.transform, "텍스트 속도", -340);
+            var (bgmSlider, bgmValue) = CreateSliderRow(window.transform, "BGM 음량", -150);
+            var (sfxSlider, sfxValue) = CreateSliderRow(window.transform, "효과음 음량", -235);
+            var (speedSlider, speedValue) = CreateSliderRow(window.transform, "텍스트 속도", -320);
+            var (autoSlider, autoValue) = CreateSliderRow(window.transform, "오토 속도", -405);
 
             var windowMode = CreateButton("WindowModeButton", window.transform, "화면: 창 모드", 30, 0);
-            SetRect((RectTransform)windowMode.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(60, -440), new Vector2(420, 70));
+            SetRect((RectTransform)windowMode.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(60, -505), new Vector2(420, 70));
             var close = CreateButton("CloseButton", window.transform, "닫기", 30, 0, skew: 16f);
             SetRect((RectTransform)close.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-60, 50), new Vector2(220, 70));
 
@@ -647,6 +815,8 @@ namespace ProjectVita.EditorTools
             SetField(panel, "sfxValue", sfxValue);
             SetField(panel, "textSpeedSlider", speedSlider);
             SetField(panel, "textSpeedValue", speedValue);
+            SetField(panel, "autoSpeedSlider", autoSlider);
+            SetField(panel, "autoSpeedValue", autoValue);
             SetField(panel, "windowModeButton", windowMode);
             SetField(panel, "windowModeLabel", windowMode.GetComponentInChildren<TMP_Text>());
             SetField(panel, "closeButton", close);

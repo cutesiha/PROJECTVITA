@@ -18,6 +18,8 @@ namespace ProjectVita.Menus
         [SerializeField] TMP_Text sfxValue;
         [SerializeField] Slider textSpeedSlider;
         [SerializeField] TMP_Text textSpeedValue;
+        [SerializeField] Slider autoSpeedSlider;
+        [SerializeField] TMP_Text autoSpeedValue;
         [SerializeField] Button windowModeButton;
         [SerializeField] TMP_Text windowModeLabel;
         [SerializeField] Button closeButton;
@@ -35,10 +37,14 @@ namespace ProjectVita.Menus
             textSpeedSlider.minValue = GameSettings.MinTextSpeed;
             textSpeedSlider.maxValue = GameSettings.MaxTextSpeed;
             textSpeedSlider.wholeNumbers = true;
+            autoSpeedSlider.minValue = GameSettings.MinAutoSpeed;
+            autoSpeedSlider.maxValue = GameSettings.MaxAutoSpeed;
+            autoSpeedSlider.wholeNumbers = true;
 
             bgmSlider.onValueChanged.AddListener(v => { GameSettings.SetBgmVolume(v / 10f); Refresh(); });
             sfxSlider.onValueChanged.AddListener(v => { GameSettings.SetSfxVolume(v / 10f); Refresh(); });
             textSpeedSlider.onValueChanged.AddListener(v => { GameSettings.SetTextSpeed((int)v); Refresh(); });
+            autoSpeedSlider.onValueChanged.AddListener(v => { GameSettings.SetAutoSpeed((int)v); Refresh(); });
             windowModeButton.onClick.AddListener(() => { GameSettings.SetFullscreen(!GameSettings.Fullscreen); Refresh(); });
             closeButton.onClick.AddListener(Close);
             root.SetActive(false);
@@ -49,6 +55,7 @@ namespace ProjectVita.Menus
             bgmSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.BgmVolume * 10f));
             sfxSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.SfxVolume * 10f));
             textSpeedSlider.SetValueWithoutNotify(GameSettings.TextSpeed);
+            autoSpeedSlider.SetValueWithoutNotify(GameSettings.AutoSpeed);
             Refresh();
             root.SetActive(true);
         }
@@ -64,6 +71,7 @@ namespace ProjectVita.Menus
             bgmValue.text = Mathf.RoundToInt(GameSettings.BgmVolume * 10f).ToString();
             sfxValue.text = Mathf.RoundToInt(GameSettings.SfxVolume * 10f).ToString();
             textSpeedValue.text = GameSettings.TextSpeed >= GameSettings.MaxTextSpeed ? "즉시" : GameSettings.TextSpeed.ToString();
+            autoSpeedValue.text = GameSettings.AutoSpeed.ToString();
             windowModeLabel.text = GameSettings.Fullscreen ? "화면: 전체 화면" : "화면: 창 모드";
         }
     }

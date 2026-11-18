@@ -134,6 +134,7 @@ namespace ProjectVita.Exploration
             }
             mapView.SetActive(true);
             DevOverlay.SetNode("(지도)");
+            Save(); // 지도에서도 저장할 수 있게 (불러오면 지도부터)
         }
 
         // ================================================================ 장소
@@ -254,10 +255,12 @@ namespace ProjectVita.Exploration
 
         // ================================================================ 공통
 
+        /// <summary>자동 저장. 장소에 있으면 그 장소, 지도면 장소 없이 (불러오면 지도부터).</summary>
         void Save()
         {
-            if (episode == null || location == null) return;
-            SaveSystem.AutoSave(episode.Id, "", null, AudioManager.Instance.CurrentBgm, EpisodeFlow.ExplorationSceneName, location.id);
+            if (episode == null) return;
+            SaveSystem.AutoSave(episode.Id, "", null, AudioManager.Instance.CurrentBgm, EpisodeFlow.ExplorationSceneName,
+                location?.id ?? "", location?.displayName ?? "지도");
         }
 
         bool HasNode(string node) =>
