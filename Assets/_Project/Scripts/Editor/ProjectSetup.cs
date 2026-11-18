@@ -16,11 +16,12 @@ namespace ProjectVita.EditorTools
     {
         const string MenuRoot = "Tools/Project Vita/";
 
-        const string FontDir = "Assets/_Project/Art/Fonts/Pretendard";
-        const string FontRegular = FontDir + "/Pretendard-Regular.otf";
-        const string FontBold = FontDir + "/Pretendard-Bold.otf";
-        const string FontAssetRegular = FontDir + "/Pretendard-Regular SDF.asset";
-        const string FontAssetBold = FontDir + "/Pretendard-Bold SDF.asset";
+        // 한글 폰트: 에이투지체 (본문 Medium, 굵게/제목 Bold). 상업 이용 가능한 무료 폰트. 2026-11-18 Pretendard에서 바꿈.
+        const string FontDir = "Assets/_Project/Art/Fonts/A2Z";
+        const string FontRegular = FontDir + "/A2Z-Medium.ttf";
+        const string FontBold = FontDir + "/A2Z-Bold.ttf";
+        internal const string FontAssetRegular = FontDir + "/A2Z-Medium SDF.asset";
+        internal const string FontAssetBold = FontDir + "/A2Z-Bold SDF.asset";
 
         const string OldScenePath = "Assets/Scenes/SampleScene.unity";
         const string BootScenePath = "Assets/_Project/Scenes/Title.unity";
@@ -150,7 +151,7 @@ namespace ProjectVita.EditorTools
             AssetDatabase.importPackageFailed -= OnTmpImportFailed;
         }
 
-        static void ApplyTmpAndFonts()
+        internal static void ApplyTmpAndFonts()
         {
             var settings = FindTmpSettings();
             if (settings == null)
@@ -178,7 +179,7 @@ namespace ProjectVita.EditorTools
             EditorUtility.SetDirty(settings);
 
             AssetDatabase.SaveAssets();
-            Debug.Log("[Setup] TMP: 기본 폰트 = Pretendard-Regular SDF (Dynamic), Modern Hangul Line Breaking = ON\n[Setup] 1단계 기본 세팅 완료.");
+            Debug.Log("[Setup] TMP: 기본 폰트 = A2Z-Medium SDF (Dynamic, 굵게 = A2Z-Bold SDF), Modern Hangul Line Breaking = ON");
         }
 
         internal static TMP_FontAsset GetOrCreateFontAsset(string fontPath, string assetPath, int atlasSize = AtlasSize)

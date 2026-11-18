@@ -110,7 +110,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `DevOverlay`: 에피소드, 노드, 최근 명령을 왼쪽 위에 표시한다. F1로 숨기고, 메뉴가 열려 있으면 저절로 숨는다(썸네일에도 안 찍힘). F5는 지금 노드 다시 시작. Development Build가 아니면 꺼진다.
 - **UI** (`ui` 브랜치, 2026-11-18. 다른 AI가 만든 HTML 시안 `dystopia-vn-ui.html`을 옮긴 임시 UI. 디스토피아 톤: 짙은 검정, 페리윙클 테두리, 시안 강조, 앰버 경고, 모노 라벨, CRT 스캔라인)
   - 색은 `Runtime/UI/UITheme`, 부품은 `Editor/UIKit`(깎인 패널, 버튼, 아이콘 버튼, 창, 슬라이더, 스위치, 화면 효과), 배치는 `Editor/DialogueSetup`. 그림은 `Art/UI`(`Editor/UIArtGenerator`가 만든다).
-  - 폰트: 한글 본문 Pretendard, 영문 라벨 IBM Plex Mono(`UIKit.Mono`), 제목 Michroma(`UIKit.Display`). 둘 다 OFL이고 한글은 Pretendard로 대체(fallback)된다. 창 제목 "SETTINGS 설정"은 `ConfirmDialog.WindowTitle`.
+  - 폰트: 한글은 에이투지체 (본문 Medium = TMP 기본, 이름/제목 Bold = `UIKit.Text(..., bold: true)`), 영문 라벨 IBM Plex Mono(`UIKit.Mono`, 섞인 한글은 Medium), 제목 Michroma(`UIKit.Display`, 섞인 한글은 Bold). 창 제목 "SETTINGS 설정"은 `ConfirmDialog.WindowTitle`.
   - 실행 중 부품(`Runtime/UI/`): `UIPanelAnim`(창 열기/닫기: 바탕 페이드 + 창이 올라오며 커짐 + 자식 차례로 페이드), `UIHoverFx`(마우스 올림: 나타나기, 밀리기, 색, 테두리, 자간), `UIToggleSwitch`, `ConfirmDialog`(예/아니오, 씬마다 하나), `UIToast`(아래 알림), `ScreenFx`(스캔라인, 노이즈, 비네트, 육각형, 먼지), `HudPanel`(왼쪽 위 REC + 에피소드). 메뉴는 일시정지 중에 열리므로 애니메이션은 모두 실제 시간(`UIAnim.Run`).
   - 대사창: 아래에서 올라오고 끝나면 내려간다. 이름표 = [식별 칩] + 육각 점 + 이름 (칩은 `Characters.csv`의 `name_tag`가 있을 때만), 왼쪽 막대는 화자 색, LOG 번호, 타이핑 커서, CLICK ▸. 오른쪽 위 AUTO/SKIP/LOG(대사 중에만)/MENU.
   - 설정: 텍스트 속도, 오토 속도, 읽은 대사만 스킵, 스캔라인, 노이즈, 화면 흔들림(끄면 `<<shake>>`와 전투 흔들림 없음), 전체 화면, BGM, 효과음.
@@ -143,7 +143,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 데이터: `Battle_Stat`, `Battle_Unit`(스탯 열 = stat_id), `Battle_Skill`, `Battle_Status`, `Battle_TypeChart`, `Battle_Encounter` → `Resources/BattleDatabase.asset`
   - 효과 문법: `Damage(power)` `FixedDamage(n)` `PercentDamage(n)` `Heal(n%)` `ApplyStatus(id,턴,확률%)` `RemoveStatus(id)` `ModifyStat(stat,단계)` `ChangeGauge(id,양)` `SkipTurn()`을 `;`로 잇는다. 앞에 `self:`(사용자), `other:`(OnHit의 공격자). 쉼표가 있으니 CSV 칸을 따옴표로 감싼다.
   - 스킬 비용 = 게이지(`cost_kind`), 게이지 처음 값은 같은 이름의 스탯. 상태이상 트리거: turn_start, turn_end, on_hit, on_act.
-  - `BattleController` + `BattleUnitView`: 이벤트를 순서대로 재생 (HP 바, 데미지 숫자, 흔들림, 급소 플래시, 로그). 스킬은 클릭 또는 숫자 키, 대상은 클릭, 오른쪽 클릭이나 뒤로 버튼으로 취소. 개발 빌드에 자동 전투 버튼.
+  - `BattleController` + `BattleUnitView`: 이벤트를 순서대로 재생한다. 스킬은 클릭 또는 숫자 키, 대상은 클릭, 오른쪽 클릭이나 뒤로 버튼으로 취소. 개발 빌드에 자동 전투 버튼.
+  - 화면 (`ui` 브랜치, 다른 AI의 시안 `battle.html`을 3 대 3 뼈대에 맞게 옮김. **전투 기획 전의 UI 틀이라 규칙이 오면 바뀔 수 있다**): 위 = HUD + ROUND/조우 칩, 행동 순서 줄(속도순, 지금 행동 강조), LOG/MENU. 가운데 = 적 카드(그림 큼), 아군 카드. 아래 = 전투 기록 한 줄 + 명령 창(스킬 카드 4칸: 타입 칩, 이름, 설명, 비용, 숫자 키 / 능력치, 전투 기록, 뒤로, 자동 / 행동 중에는 COMMAND LOCK 덮개).
+  - 연출: 시작 배너(ENGAGE)와 카드 등장, 라운드 배너, 돌진, 피격(그림 흰 번쩍임 + 카드 붉은 기 + 밀려남 + 데미지 숫자 튀어오름), HP 붉은 잔상이 늦게 따라옴, 세게 맞으면 화면 흔들림 + 경직, 치명타 흰 플래시, 아군 피격 시 화면 가장자리 붉게, CRITICAL/WEAK POINT/RESISTED, 쓰러짐(바래며 가라앉음), 결과 창(VICTORY/DEFEAT, 라운드, 준 피해, 남은 HP).
+  - `BattleStatusPanel`(능력치 창): 카드 클릭(또는 오른쪽 클릭), 능력치 버튼, I 키. 능력치 줄은 `Battle_Stat.csv`의 행마다 만들어진다 (기본값 → 지금 값, 단계, 전체 유닛 최고값 기준 막대). 상태이상, 상성(약점/내성, `Battle_TypeChart.csv`), 스킬.
+  - `BattleLog`: 전투 기록. 대사 기록 창(`BacklogPanel`, `battleSource`)을 그대로 쓴다. 스킬 타입 색(보조/무속성/속성)은 임시라 기획이 오면 데이터로 뺀다.
   - 패배 처리 `lose_rule`: gameover(타이틀로), retry(다시), continue(lose_node). 전투 그림: `Art/Battle/{portrait_id}.png`, 없으면 같은 id 캐릭터의 기본 표정.
   - 더미 데이터(아군 3, 적 3, 스킬 12, 상태이상 3)는 세계관 고유명사를 쓰지 않는다. 비디님의 양식이 오면 CSV와 규칙 클래스를 바꾼다.
 - **데이터 테이블**: `Assets/_Project/Data/*.csv`, UTF-8 BOM, LF. 1행은 컬럼명, 2행은 설명, 3행은 허용값이다. id는 영어로 쓴다.
@@ -152,8 +156,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **OneDrive 밖, 영문 경로**에 프로젝트를 둔다. OneDrive 동기화는 Library 잠금과 지연을, 한글 경로는 빌드 도구 문제를 일으킨다.
 - TMP Settings에서 **"Use Modern Hangul Line Breaking Rules"를 켠다.** TMP Essential Resources를 다시 임포트하면 꺼지니 `1단계 기본 세팅 적용` 메뉴를 다시 실행한다.
-- 한글 폰트는 Pretendard (OFL, `Assets/_Project/Art/Fonts/Pretendard/`)다. TMP 기본 폰트는 `Pretendard-Regular SDF` (Dynamic, 2048 멀티 아틀라스)이고, `<b>`는 `Pretendard-Bold SDF`를 쓴다. UI 영문 폰트 IBM Plex Mono, Michroma(OFL, `Art/Fonts/`)도 Dynamic이라 커밋 전에 같이 비워진다.
-- TMP `<font="이름">` 태그는 폰트 에셋이 Resources 안에 있어야 동작한다. 한 줄에 영문 폰트와 한글을 섞을 때는 영문 폰트 에셋의 fallback(Pretendard)에 맡긴다.
+- 한글 폰트는 **에이투지체** (상업 이용 가능 무료 폰트, `Assets/_Project/Art/Fonts/A2Z/A2Z-Medium.ttf`, `A2Z-Bold.ttf`. 2026-11-18 Pretendard에서 바꿈)다. TMP 기본 폰트는 `A2Z-Medium SDF` (Dynamic, 2048 멀티 아틀라스)이고, `<b>`는 `A2Z-Bold SDF`를 쓴다. Pretendard 폴더는 남아 있지만 쓰지 않는다. UI 영문 폰트 IBM Plex Mono, Michroma(OFL, `Art/Fonts/`)도 Dynamic이라 커밋 전에 같이 비워진다. 폰트 설정은 `UIArtGenerator.EnsureFonts`(씬 생성이 부름)와 `ProjectSetup`의 상수에 있다.
+- TMP `<font="이름">` 태그는 폰트 에셋이 Resources 안에 있어야 동작한다. 한 줄에 영문 폰트와 한글을 섞을 때는 영문 폰트 에셋의 fallback(에이투지체)에 맡긴다.
+- 에셋 파일 이름은 영어로 한다 (받은 한글 파일 이름은 `.meta`와 같이 옮겨서 바꾼다. GUID가 유지된다).
 - Git LFS는 쓰지 않는다. `.gitattributes`에서 이미지, 오디오, 폰트는 `binary`다.
 - Dynamic TMP 폰트 에셋은 플레이하는 동안 커진다. 커밋 전에 비우거나, Static 아틀라스(KS X 1001 2350자)로 굽는다.
 - 에디터 도구의 네임스페이스는 `.EditorTools`로 한다. `.Editor`로 끝나면 `: Editor`가 `UnityEditor.Editor` 대신 그 네임스페이스로 해석된다.

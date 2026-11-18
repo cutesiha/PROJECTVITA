@@ -23,6 +23,8 @@ namespace ProjectVita.Story
         [SerializeField] BacklogEntry entryTemplate;
         [SerializeField] GameObject emptyLabel;
         [SerializeField] Button closeButton;
+        [Tooltip("켜면 대사 기록 대신 전투 기록(BattleLog)을 보여 준다 (전투 씬)")]
+        [SerializeField] bool battleSource;
 
         public bool IsOpen => panel != null && panel.IsShown;
 
@@ -88,7 +90,7 @@ namespace ProjectVita.Story
 
         void Build()
         {
-            var list = Backlog.Entries;
+            var list = battleSource ? Battle.BattleLog.Entries : Backlog.Entries;
             if (emptyLabel != null) emptyLabel.SetActive(list.Count == 0);
             while (pool.Count < list.Count)
             {

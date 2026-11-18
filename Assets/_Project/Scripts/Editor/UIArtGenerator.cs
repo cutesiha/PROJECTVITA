@@ -23,7 +23,6 @@ namespace ProjectVita.EditorTools
         public const string MonoFontAsset = FontsDir + "/IBMPlexMono/IBMPlexMono-Regular SDF.asset";
         public const string MonoMediumFontAsset = FontsDir + "/IBMPlexMono/IBMPlexMono-Medium SDF.asset";
         public const string DisplayFontAsset = FontsDir + "/Michroma/Michroma-Regular SDF.asset";
-        const string PretendardAsset = FontsDir + "/Pretendard/Pretendard-Regular SDF.asset";
 
         /// <summary>9-slice 테두리(픽셀). 이 표에 있는 그림만 9-slice로 임포트한다.</summary>
         static readonly Dictionary<string, int> Borders = new Dictionary<string, int>
@@ -157,6 +156,21 @@ namespace ProjectVita.EditorTools
                 r.Stroke(new Vector2(7, 34), new Vector2(41, 34), 3.2f);
                 return r;
             });
+            Make("icon_stats", () =>
+            {
+                var r = new Raster(48, 48);
+                r.Stroke(new Vector2(12, 38), new Vector2(12, 24), 3.6f);
+                r.Stroke(new Vector2(24, 38), new Vector2(24, 12), 3.6f);
+                r.Stroke(new Vector2(36, 38), new Vector2(36, 18), 3.6f);
+                return r;
+            });
+            Make("icon_back", () =>
+            {
+                var r = new Raster(48, 48);
+                r.Stroke(new Vector2(38, 24), new Vector2(10, 24), 3.2f);
+                r.StrokePolyline(new[] { new Vector2(22, 12), new Vector2(10, 24), new Vector2(22, 36) }, 3.2f, false);
+                return r;
+            });
             Make("icon_close", () =>
             {
                 var r = new Raster(32, 32);
@@ -180,28 +194,31 @@ namespace ProjectVita.EditorTools
 
         // ------------------------------------------------------------ 폰트
 
+        /// <summary>
+        /// UI 폰트를 맞춘다. 한글 기본 = 에이투지체 Medium(굵게는 Bold, TMP 기본 폰트로 지정).
+        /// 영문 라벨(IBM Plex Mono)에 섞인 한글은 Medium으로, 제목(Michroma)에 섞인 한글은 Bold로 그린다 (fallback).
+        /// </summary>
         public static void EnsureFonts()
         {
-            var pretendard = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(PretendardAsset);
-            foreach (var (ttf, asset) in new[]
+            ProjectSetup.ApplyTmpAndFonts();
+            var medium = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(ProjectSetup.FontAssetRegular);
+            var bold = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(ProjectSetup.FontAssetBold);
+            foreach (var (ttf, asset, korean) in new[]
             {
-                (FontsDir + "/IBMPlexMono/IBMPlexMono-Regular.ttf", MonoFontAsset),
-                (FontsDir + "/IBMPlexMono/IBMPlexMono-Medium.ttf", MonoMediumFontAsset),
-                (FontsDir + "/Michroma/Michroma-Regular.ttf", DisplayFontAsset),
+                (FontsDir + "/IBMPlexMono/IBMPlexMono-Regular.ttf", MonoFontAsset, medium),
+                (FontsDir + "/IBMPlexMono/IBMPlexMono-Medium.ttf", MonoMediumFontAsset, medium),
+                (FontsDir + "/Michroma/Michroma-Regular.ttf", DisplayFontAsset, bold),
             })
             {
                 var fa = ProjectSetup.GetOrCreateFontAsset(ttf, asset, 1024);
-                if (fa == null || pretendard == null) continue;
-                // 영문 폰트에 없는 한글은 Pretendard로 그린다.
-                fa.fallbackFontAssetTable ??= new List<TMP_FontAsset>();
-                if (!fa.fallbackFontAssetTable.Contains(pretendard))
-                {
-                    fa.fallbackFontAssetTable.Add(pretendard);
-                    EditorUtility.SetDirty(fa);
-                }
+                if (fa == null || korean == null) continue;
+                fa.fallbackFontAssetTable = new List<TMP_FontAsset> { korean };
+                EditorUtility.SetDirty(fa);
             }
             AssetDatabase.SaveAssets();
         }
+
+        public static TMP_FontAsset KoreanBold => AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(ProjectSetup.FontAssetBold);
 
         public static TMP_FontAsset Mono => AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(MonoFontAsset);
         public static TMP_FontAsset MonoMedium => AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(MonoMediumFontAsset);

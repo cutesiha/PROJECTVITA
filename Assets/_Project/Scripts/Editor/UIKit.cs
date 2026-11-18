@@ -47,10 +47,12 @@ namespace ProjectVita.EditorTools
             return img;
         }
 
+        /// <summary>글자. bold면 에이투지체 Bold (이름, 제목), 아니면 기본 폰트 (에이투지체 Medium).</summary>
         public static TextMeshProUGUI Text(string name, Transform parent, string text, float size, Color color,
-            TextAlignmentOptions align, TMP_FontAsset font = null, float spacing = 0f)
+            TextAlignmentOptions align, TMP_FontAsset font = null, float spacing = 0f, bool bold = false)
         {
             var tmp = Rect(name, parent).gameObject.AddComponent<TextMeshProUGUI>();
+            if (font == null && bold) font = UIArtGenerator.KoreanBold;
             tmp.font = font != null ? font : TMP_Settings.defaultFontAsset;
             tmp.text = text;
             tmp.fontSize = size;

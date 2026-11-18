@@ -30,6 +30,8 @@ namespace ProjectVita.Menus
         [Tooltip("대사 기록. 전투 씬에는 없다.")]
         [SerializeField] BacklogPanel backlog;
         [SerializeField] ConfirmDialog confirm;
+        [Tooltip("Esc로 먼저 닫을 다른 창 (IClosablePanel). 전투의 능력치 창 등")]
+        [SerializeField] MonoBehaviour[] extraPanels;
 
         Texture2D thumbnail;
         bool opening;
@@ -73,6 +75,7 @@ namespace ProjectVita.Menus
             if (kb == null || !kb.escapeKey.wasPressedThisFrame || EpisodeFlow.IsLoading || opening) return;
 
             if (confirm != null && confirm.IsOpen) confirm.Cancel();
+            else if (CloseExtraPanel()) { }
             else if (slots.IsOpen) slots.Close();
             else if (settings.IsOpen) settings.Close();
             else if (backlog != null && backlog.IsOpen) backlog.Close();
@@ -80,9 +83,25 @@ namespace ProjectVita.Menus
             else Open();
         }
 
+        /// <summary>열린 다른 창(능력치 창 등)이 있으면 하나 닫고 true.</summary>
+        bool CloseExtraPanel()
+        {
+            if (extraPanels == null) return false;
+            foreach (var p in extraPanels)
+            {
+                if (p is IClosablePanel c && c.IsOpen)
+                {
+                    c.Close();
+                    return true;
+                }
+            }
+            return false;
+        }
+
         async void Open()
         {
             if (EpisodeFlow.IsLoading || opening || IsOpen) return;
+            CloseExtraPanel();
             // 대사 기록을 보다가 메뉴 버튼을 누른 경우: 기록을 닫고 연다 (기록이 일시정지를 풀어 버리지 않게).
             if (backlog != null && backlog.IsOpen) backlog.Close();
             opening = true;
