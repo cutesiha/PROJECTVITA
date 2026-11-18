@@ -6,6 +6,7 @@ using ProjectVita.Core;
 using ProjectVita.Exploration;
 using ProjectVita.Menus;
 using ProjectVita.Story;
+using ProjectVita.UI;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -17,16 +18,17 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using Yarn.Unity;
 using Yarn.Unity.Editor;
+using K = ProjectVita.EditorTools.UIKit;
 
 namespace ProjectVita.EditorTools
 {
     /// <summary>
-    /// 대사 시스템(문서 4-2, 4-4)의 에셋과 씬을 메뉴 하나로 만든다.
+    /// 씬 4개(Title, Story, Exploration, Battle)를 메뉴 하나로 만든다.
     /// - Yarn Project가 없으면 만든다 (Dialogue 폴더 아래 모든 .yarn 포함).
-    /// - 리소스 목록(AssetCatalog)을 갱신한다.
-    /// - Title, Story 씬을 처음부터 다시 만든다. 씬을 손으로 고친 내용은 사라진다. 바꿀 것은 이 파일에서 고친다.
-    /// - Build Settings에 Title, Story를 맨 앞에 넣는다.
-    /// - 끝나면 Episodes.csv를 검사한다.
+    /// - 임시 UI 그림과 UI 폰트, 리소스 목록, CSV 데이터를 먼저 맞춘다.
+    /// - 씬을 처음부터 다시 만든다. 씬을 손으로 고친 내용은 사라진다. 바꿀 것은 이 파일(배치)과 UIKit(부품), UITheme(색)에서 고친다.
+    /// - UI는 임시 UI 시안(dystopia-vn-ui.html)을 옮긴 것이다: 어두운 패널, 깎인 모서리, 페리윙클 테두리, 시안 강조, 모노 라벨, 스캔라인.
+    /// - Build Settings에 네 씬을 맨 앞에 넣고, Episodes.csv를 검사한다.
     /// 여러 번 실행해도 안전하다. 씬 파일은 지우지 않고 내용만 바꾸므로 GUID가 유지된다.
     /// </summary>
     public static class DialogueSetup
@@ -45,15 +47,6 @@ namespace ProjectVita.EditorTools
         // 기준 해상도. Player Settings(1단계)와 같다.
         static readonly Vector2 RefResolution = new Vector2(1920, 1080);
 
-        // 임시 UI 색. 두부님의 UI 아트가 오면 바꾼다.
-        // 감각: 어두운 바탕에 강한 포인트 색, 각진 모양, 굵은 글자 (참고 게임의 에셋이나 레이아웃은 쓰지 않는다).
-        static readonly Color ColTitleBackground = Hex("#0B0C0F");
-        static readonly Color ColBox = new Color(0.03f, 0.03f, 0.04f, 0.88f);
-        static readonly Color ColAccent = Hex("#B3261E");
-        static readonly Color ColButton = Hex("#22262E");
-        static readonly Color ColPanel = Hex("#14171C");
-        static readonly Color ColText = Hex("#ECEDEF");
-        static readonly Color ColSubText = Hex("#9AA0A6");
         static readonly Color ColDev = new Color(0.63f, 1f, 0.63f, 0.9f);
 
         [MenuItem(MenuRoot + "씬 생성 (Title, Story, Exploration, Battle)", priority = 10)]
@@ -68,6 +61,8 @@ namespace ProjectVita.EditorTools
                 Debug.LogError($"[Setup] Yarn Project({YarnProjectPath}) 또는 Episodes.csv({EpisodesCsvPath})가 없어서 씬을 만들 수 없다.");
                 return;
             }
+            UIArtGenerator.Generate();
+            UIArtGenerator.EnsureFonts();
             AssetCatalogBuilder.Rebuild(log: false);
             DataImporter.ImportAll();
 
@@ -113,9 +108,9 @@ namespace ProjectVita.EditorTools
         {
             var d = BuildDialogueScene(StoryScenePath);
             var director = d.system.AddComponent<StoryDirector>();
-            SetField(director, "runner", d.runner);
-            SetField(director, "stage", d.stage);
-            SetField(director, "episodesCsv", episodesCsv);
+            K.SetField(director, "runner", d.runner);
+            K.SetField(director, "stage", d.stage);
+            K.SetField(director, "episodesCsv", episodesCsv);
 
             EditorSceneManager.SaveScene(d.scene, StoryScenePath);
             Debug.Log("[Setup] Story 씬 생성: " + StoryScenePath);
@@ -131,7 +126,10 @@ namespace ProjectVita.EditorTools
             public RectTransform dialogueBox;
         }
 
-        /// <summary>대사가 나오는 씬의 공통 부분: 무대, 대사창, 선택지, 화면 효과, 일시정지, 개발용 표시, DialogueRunner.</summary>
+        /// <summary>
+        /// 대사가 나오는 씬의 공통 부분: 무대, 분위기 효과, 대사창, 선택지, HUD, 오른쪽 위 버튼, 일시정지, 개발용 표시, DialogueRunner.
+        /// 그리는 순서(아래부터): 배경 → 육각형/먼지 → 인물 → CG → 비네트/와이프 → 노이즈/스캔라인 → 대사창 → HUD → 플래시/페이드
+        /// </summary>
         static DialogueScene BuildDialogueScene(string path)
         {
             var scene = OpenClean(path);
@@ -141,118 +139,93 @@ namespace ProjectVita.EditorTools
             var canvas = CreateCanvas("StoryCanvas", 0);
             var stage = canvas.gameObject.AddComponent<StoryStage>();
 
-            // ---- 무대 (아래부터 그려진다)
-            Stretch(CreateImage("StageBase", canvas.transform, Color.black).rectTransform);
-            var shakeRoot = CreateRect("ShakeRoot", canvas.transform);
-            Stretch(shakeRoot);
-            var bgBack = CreateImage("BackgroundBack", shakeRoot, Color.white);
-            Stretch(bgBack.rectTransform);
-            var bgFront = CreateImage("BackgroundFront", shakeRoot, Color.white);
-            Stretch(bgFront.rectTransform);
-            var characters = CreateRect("Characters", shakeRoot);
-            Stretch(characters);
-            var cg = CreateImage("CG", shakeRoot, Color.white);
-            Stretch(cg.rectTransform);
+            // ---- 무대
+            K.Stretch(K.Img("StageBase", canvas.transform, UITheme.Bg).rectTransform);
+            var shakeRoot = K.Rect("ShakeRoot", canvas.transform);
+            K.Stretch(shakeRoot);
+            var bgBack = K.Img("BackgroundBack", shakeRoot, Color.white);
+            K.Stretch(bgBack.rectTransform);
+            var bgFront = K.Img("BackgroundFront", shakeRoot, Color.white);
+            K.Stretch(bgFront.rectTransform);
+            var ambient = K.Rect("Ambient", shakeRoot);
+            K.Stretch(ambient);
+            var characters = K.Rect("Characters", shakeRoot);
+            K.Stretch(characters);
+            var cg = K.Img("CG", shakeRoot, Color.white);
+            K.Stretch(cg.rectTransform);
 
-            var vignette = CreateImage("Vignette", canvas.transform, Color.white);
-            Stretch(vignette.rectTransform);
-            var wipe = CreateImage("Wipe", canvas.transform, Color.black);
-            Stretch(wipe.rectTransform);
+            var vignette = K.Img("Vignette", canvas.transform, Color.white);
+            K.Stretch(vignette.rectTransform);
+            var wipe = K.Img("Wipe", canvas.transform, Color.black);
+            K.Stretch(wipe.rectTransform);
+
+            // ---- 분위기 효과 (육각형, 먼지는 무대 안 / 노이즈, 스캔라인, 비네트는 무대 위)
+            var fxLayer = K.Rect("ScreenFx", canvas.transform);
+            K.Stretch(fxLayer);
+            K.CreateScreenFx(ambient, fxLayer);
 
             // ---- 대사창
-            var box = CreateImage("DialogueBox", canvas.transform, ColBox);
-            var boxRt = box.rectTransform;
-            boxRt.anchorMin = new Vector2(0, 0);
-            boxRt.anchorMax = new Vector2(1, 0);
-            boxRt.pivot = new Vector2(0.5f, 0);
-            boxRt.offsetMin = new Vector2(80, 36);
-            boxRt.offsetMax = new Vector2(-80, 36 + 290);
-
-            var accent = CreateImage("AccentLine", boxRt, ColAccent);
-            SetRect(accent.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(0, 4));
-
-            var namePlate = CreateImage("NamePlate", boxRt, ColAccent);
-            namePlate.gameObject.AddComponent<UISkew>().Skew = 26f;
-            SetRect(namePlate.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(36, 2), new Vector2(330, 62));
-            var nameText = CreateText("NameText", namePlate.transform, "이름", 34, ColText, TextAlignmentOptions.Center);
-            nameText.fontStyle = FontStyles.Bold;
-            Stretch(nameText.rectTransform, 16, 4);
-
-            var bodyText = CreateText("BodyText", boxRt, "", 36, ColText, TextAlignmentOptions.TopLeft);
-            bodyText.lineSpacing = 14;
-            Stretch(bodyText.rectTransform);
-            bodyText.rectTransform.offsetMin = new Vector2(60, 40);
-            bodyText.rectTransform.offsetMax = new Vector2(-60, -62);
-
-            var next = CreateImage("NextIndicator", boxRt, ColAccent);
-            SetRect(next.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(0.5f, 0.5f), new Vector2(-46, 40), new Vector2(18, 18));
-            next.rectTransform.localRotation = Quaternion.Euler(0, 0, 45);
-
-            // ---- 로그 / 오토 / 스킵 (대사창 오른쪽 위, 대사창의 자식이라 대사창과 같이 보이고 숨는다)
-            var quick = CreateRect("QuickMenu", boxRt);
-            SetRect(quick, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(-36, 10), new Vector2(384, 44));
-            var quickLayout = quick.gameObject.AddComponent<HorizontalLayoutGroup>();
-            quickLayout.spacing = 10;
-            quickLayout.childControlWidth = true;
-            quickLayout.childControlHeight = true;
-            quickLayout.childForceExpandWidth = true;
-            quickLayout.childForceExpandHeight = true;
-            var logButton = CreateButton("LogButton", quick, "로그", 20, 0, skew: 12f);
-            var autoButton = CreateButton("AutoButton", quick, "오토", 20, 0, skew: 12f);
-            var skipButton = CreateButton("SkipButton", quick, "스킵", 20, 0, skew: 12f);
-            var quickMenu = quick.gameObject.AddComponent<DialogueQuickMenu>();
-            SetField(quickMenu, "logButton", logButton);
-            SetField(quickMenu, "autoButton", autoButton);
-            SetField(quickMenu, "skipButton", skipButton);
+            var box = BuildDialogueBox(canvas.transform, out var parts);
 
             // ---- 선택지
-            var options = CreateRect("Options", canvas.transform);
-            SetRect(options, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 120), new Vector2(960, 0));
+            var options = K.Rect("Options", canvas.transform);
+            K.SetRect(options, K.Center, K.Center, K.Center, new Vector2(0, 150), new Vector2(1000, 0));
             var layout = options.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 16;
+            layout.spacing = 14;
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
             options.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var optionTemplate = CreateButton("OptionTemplate", options, "선택지", 32, 84, skew: 22f);
+            var optionTemplate = OptionButton(options);
 
-            // ---- 메뉴 버튼 (오른쪽 위)
-            var menuButton = CreateButton("MenuButton", canvas.transform, "메뉴 (Esc)", 24, 0, skew: 14f);
-            SetRect((RectTransform)menuButton.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-28, -22), new Vector2(190, 52));
+            // ---- HUD (왼쪽 위)와 버튼 (오른쪽 위)
+            CreateHud(canvas.transform);
+            var quickBar = CreateQuickBar(canvas.transform, box.gameObject, out var menuButton, out var quickMenu);
 
             // ---- 화면 효과 (대사창 위)
-            var flash = CreateImage("Flash", canvas.transform, Color.white);
-            Stretch(flash.rectTransform);
-            var fade = CreateImage("Fade", canvas.transform, Color.black);
-            Stretch(fade.rectTransform);
+            var flash = K.Img("Flash", canvas.transform, Color.white);
+            K.Stretch(flash.rectTransform);
+            var fade = K.Img("Fade", canvas.transform, Color.black);
+            K.Stretch(fade.rectTransform);
 
-            SetField(stage, "shakeRoot", shakeRoot);
-            SetField(stage, "backgroundBack", bgBack);
-            SetField(stage, "backgroundFront", bgFront);
-            SetField(stage, "characterRoot", characters);
-            SetField(stage, "cgImage", cg);
-            SetField(stage, "vignette", vignette);
-            SetField(stage, "wipeOverlay", wipe.rectTransform);
-            SetField(stage, "flash", flash);
-            SetField(stage, "fadeOverlay", fade);
+            K.SetField(stage, "shakeRoot", shakeRoot);
+            K.SetField(stage, "backgroundBack", bgBack);
+            K.SetField(stage, "backgroundFront", bgFront);
+            K.SetField(stage, "characterRoot", characters);
+            K.SetField(stage, "cgImage", cg);
+            K.SetField(stage, "vignette", vignette);
+            K.SetField(stage, "wipeOverlay", wipe.rectTransform);
+            K.SetField(stage, "flash", flash);
+            K.SetField(stage, "fadeOverlay", fade);
 
             var backlog = CreatePauseCanvas(menuButton, withBacklog: true);
-            SetField(quickMenu, "backlog", backlog);
+            K.SetField(quickMenu, "backlog", backlog);
             CreateDevCanvas();
 
             // ---- 대화 시스템 (Runner + Presenter)
             var system = new GameObject("DialogueSystem");
             var presenter = system.AddComponent<StoryPresenter>();
-            SetField(presenter, "dialogueBox", box.gameObject);
-            SetField(presenter, "namePlate", namePlate.gameObject);
-            SetField(presenter, "namePlateImage", namePlate);
-            SetField(presenter, "nameText", nameText);
-            SetField(presenter, "bodyText", bodyText);
-            SetField(presenter, "nextIndicator", next.rectTransform);
-            SetField(presenter, "optionsRoot", options);
-            SetField(presenter, "optionTemplate", optionTemplate);
+            K.SetField(presenter, "dialogueBox", box.gameObject);
+            K.SetField(presenter, "boxGroup", parts.group);
+            K.SetField(presenter, "namePlate", parts.namePlate);
+            K.SetField(presenter, "namePlateImage", parts.chip);
+            K.SetField(presenter, "nameTagChip", parts.chip.gameObject);
+            K.SetField(presenter, "nameTagText", parts.chipText);
+            K.SetField(presenter, "nameDot", parts.dot);
+            K.SetField(presenter, "nameText", parts.nameText);
+            K.SetField(presenter, "accentBar", parts.accent);
+            K.SetField(presenter, "metaText", parts.meta);
+            K.SetField(presenter, "bodyText", parts.body);
+            K.SetField(presenter, "typingCursor", parts.cursor);
+            K.SetField(presenter, "nextIndicator", parts.next);
+            K.SetField(presenter, "nextArrow", parts.nextArrow);
+            K.SetField(presenter, "optionsRoot", options);
+            K.SetField(presenter, "optionTemplate", optionTemplate);
+            K.SetValue(presenter, "speechColor", p => p.colorValue = UITheme.Text);
+            K.SetValue(presenter, "narrationColor", p => p.colorValue = UITheme.Narration);
+            K.SetValue(presenter, "defaultNameColor", p => p.colorValue = UITheme.Periwinkle);
 
             var runner = system.AddComponent<DialogueRunner>();
             var so = new SerializedObject(runner);
@@ -266,100 +239,344 @@ namespace ProjectVita.EditorTools
             presenters.GetArrayElementAtIndex(0).objectReferenceValue = presenter;
             so.ApplyModifiedPropertiesWithoutUndo();
 
-            return new DialogueScene { scene = scene, canvas = canvas, stage = stage, runner = runner, system = system, dialogueBox = boxRt };
+            return new DialogueScene { scene = scene, canvas = canvas, stage = stage, runner = runner, system = system, dialogueBox = box };
         }
 
-        /// <summary>일시정지 메뉴와 그 위에 뜨는 화면들(대사 기록, 세이브 슬롯, 설정). 대사 기록을 만들었으면 돌려준다.</summary>
+        sealed class BoxParts
+        {
+            public CanvasGroup group;
+            public GameObject namePlate;
+            public Image chip;
+            public TMP_Text chipText;
+            public Image dot;
+            public TMP_Text nameText;
+            public Image accent;
+            public TMP_Text meta;
+            public TMP_Text body;
+            public RectTransform cursor;
+            public CanvasGroup next;
+            public RectTransform nextArrow;
+        }
+
+        /// <summary>
+        /// 대사창: 깎인 패널 + 테두리, 왼쪽 강조 막대(화자 색), 모서리 꺾쇠, LOG 번호, 이름표([칩] + 육각 점 + 이름), 본문, 타이핑 커서, CLICK ▸.
+        /// </summary>
+        static RectTransform BuildDialogueBox(Transform canvas, out BoxParts p)
+        {
+            p = new BoxParts();
+            var box = K.CutPanel("DialogueBox", canvas, 16, UITheme.Panel, UITheme.Line);
+            var rt = box.rectTransform;
+            K.SetRect(rt, K.Bottom, K.Bottom, K.Bottom, new Vector2(0, 44), new Vector2(1560, 226));
+            p.group = box.gameObject.AddComponent<CanvasGroup>();
+            p.group.blocksRaycasts = false;
+
+            p.accent = K.Sprite("AccentBar", rt, "ui_grad_v", UITheme.Periwinkle);
+            p.accent.rectTransform.anchorMin = new Vector2(0, 0);
+            p.accent.rectTransform.anchorMax = new Vector2(0, 1);
+            p.accent.rectTransform.pivot = new Vector2(0, 1);
+            p.accent.rectTransform.anchoredPosition = new Vector2(1, -15);
+            p.accent.rectTransform.sizeDelta = new Vector2(4, -16);
+
+            // 모서리 꺾쇠: 깎인 모서리 안쪽에. 오른쪽 아래는 가운데를 축으로 180도 돌린다.
+            var tl = K.Sprite("CornerTL", rt, "ui_corner", UITheme.PeriwinkleBright.WithAlpha(0.85f));
+            K.Place(tl.rectTransform, K.TopLeft, new Vector2(12, -12), new Vector2(13, 13));
+            var br = K.Sprite("CornerBR", rt, "ui_corner", UITheme.PeriwinkleBright.WithAlpha(0.85f));
+            K.SetRect(br.rectTransform, K.BottomRight, K.BottomRight, K.Center, new Vector2(-18.5f, 18.5f), new Vector2(13, 13));
+            br.rectTransform.localRotation = Quaternion.Euler(0, 0, 180);
+
+            p.meta = K.Mono("Meta", rt, "LOG.001", 13, UITheme.TextDim.WithAlpha(0.6f), TextAlignmentOptions.Right, 24f);
+            K.Place(p.meta.rectTransform, K.TopRight, new Vector2(-28, -16), new Vector2(220, 20));
+
+            // 이름표: 위쪽 테두리에 걸쳐 놓인다. [칩 SR-04][◆ 이름]
+            var plate = K.Rect("NamePlate", rt);
+            plate.anchorMin = plate.anchorMax = new Vector2(0, 1);
+            plate.pivot = new Vector2(0, 0.5f);
+            plate.anchoredPosition = new Vector2(40, 2);
+            var plateLayout = plate.gameObject.AddComponent<HorizontalLayoutGroup>();
+            plateLayout.childAlignment = TextAnchor.MiddleLeft;
+            plateLayout.childControlWidth = plateLayout.childControlHeight = true;
+            plateLayout.childForceExpandWidth = plateLayout.childForceExpandHeight = false;
+            var fitter = plate.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            p.namePlate = plate.gameObject;
+
+            p.chip = K.Img("Chip", plate, UITheme.Periwinkle);
+            p.chip.gameObject.AddComponent<UISkew>().Skew = 13f;
+            var chipLayout = p.chip.gameObject.AddComponent<HorizontalLayoutGroup>();
+            chipLayout.padding = new RectOffset(20, 16, 7, 7);
+            chipLayout.childAlignment = TextAnchor.MiddleCenter;
+            chipLayout.childControlWidth = chipLayout.childControlHeight = true;
+            p.chipText = K.Mono("ChipText", p.chip.transform, "ID", 16, UITheme.Hex("#0A0B10"), TextAlignmentOptions.Center, 10f, medium: true);
+
+            var namePanel = K.Img("NamePanel", plate, UITheme.Hex("#14161F"));
+            namePanel.gameObject.AddComponent<UISkew>().Skew = 13f;
+            var nameOutline = namePanel.gameObject.AddComponent<Outline>();
+            nameOutline.effectColor = UITheme.Line;
+            nameOutline.effectDistance = new Vector2(1.5f, -1.5f);
+            var nameLayout = namePanel.gameObject.AddComponent<HorizontalLayoutGroup>();
+            nameLayout.padding = new RectOffset(22, 32, 7, 7);
+            nameLayout.spacing = 12;
+            nameLayout.childAlignment = TextAnchor.MiddleLeft;
+            nameLayout.childControlWidth = nameLayout.childControlHeight = true;
+            nameLayout.childForceExpandWidth = nameLayout.childForceExpandHeight = false;
+            p.dot = K.Sprite("Dot", namePanel.transform, "ui_hex_fill", UITheme.Periwinkle);
+            var dotLe = p.dot.gameObject.AddComponent<LayoutElement>();
+            dotLe.preferredWidth = 13;
+            dotLe.preferredHeight = 15;
+            p.nameText = K.Text("NameText", namePanel.transform, "이름", 26, UITheme.TextBright, TextAlignmentOptions.Left, spacing: 6f);
+            p.nameText.textWrappingMode = TextWrappingModes.NoWrap;
+
+            // 본문
+            p.body = K.Text("BodyText", rt, "", 32, UITheme.Text, TextAlignmentOptions.TopLeft, spacing: 1f);
+            p.body.lineSpacing = 22;
+            K.Stretch(p.body.rectTransform, 62, 34, 76, 44);
+            var cursor = K.Img("TypingCursor", p.body.transform, UITheme.Cyan);
+            cursor.rectTransform.anchorMin = cursor.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            cursor.rectTransform.pivot = Vector2.zero;
+            cursor.rectTransform.sizeDelta = new Vector2(13, 34);
+            p.cursor = cursor.rectTransform;
+
+            // CLICK ▸
+            var next = K.Rect("NextIndicator", rt);
+            K.Place(next, K.BottomRight, new Vector2(-30, 20), new Vector2(160, 24));
+            p.next = next.gameObject.AddComponent<CanvasGroup>();
+            var nextLabel = K.Mono("Label", next, "CLICK", 13, UITheme.TextDim, TextAlignmentOptions.Right, 22f);
+            K.Place(nextLabel.rectTransform, K.Right, new Vector2(-24, 0), new Vector2(120, 20));
+            var arrow = K.Sprite("Arrow", next, "ui_tri", UITheme.Periwinkle);
+            K.Place(arrow.rectTransform, K.Right, Vector2.zero, new Vector2(12, 14));
+            p.nextArrow = arrow.rectTransform;
+            return rt;
+        }
+
+        /// <summary>선택지 버튼: 깎인 패널, 왼쪽에 번호. 마우스를 올리면 시안 막대가 나타나고 글자가 밀린다.</summary>
+        static Button OptionButton(Transform parent)
+        {
+            var fill = K.CutPanel("OptionTemplate", parent, 10, Color.white, UITheme.Line, raycast: true);
+            fill.gameObject.AddComponent<LayoutElement>().preferredHeight = 78;
+            var button = fill.gameObject.AddComponent<Button>();
+            button.targetGraphic = fill;
+            K.Colors(button, UITheme.Panel, UITheme.PanelHover, new Color32(28, 34, 48, 250));
+            var bar = K.Img("Bar", fill.transform, UITheme.Cyan);
+            bar.rectTransform.anchorMin = new Vector2(0, 0);
+            bar.rectTransform.anchorMax = new Vector2(0, 1);
+            bar.rectTransform.pivot = new Vector2(0, 0.5f);
+            bar.rectTransform.anchoredPosition = new Vector2(1, -5);
+            bar.rectTransform.sizeDelta = new Vector2(3, -20);
+            var label = K.Text("Label", fill.transform, "선택지", 29, UITheme.Text, TextAlignmentOptions.Left, spacing: 4f);
+            K.Stretch(label.rectTransform, 34, 4, 30, 4);
+            var hover = fill.gameObject.AddComponent<UIHoverFx>();
+            K.SetArray(hover, "reveal", new Object[] { bar });
+            K.SetArray(hover, "shift", new Object[] { label.rectTransform });
+            K.SetValue(hover, "shiftBy", sp => sp.vector2Value = new Vector2(8, 0));
+            K.SetArray(hover, "tint", new Object[] { label });
+            K.SetValue(hover, "hoverColor", sp => sp.colorValue = UITheme.TextBright);
+            K.SetArray(hover, "lineTint", new Object[] { fill.transform.Find("Line").GetComponent<Image>() });
+            K.SetValue(hover, "lineHoverColor", sp => sp.colorValue = UITheme.Cyan.WithAlpha(0.45f));
+            return button;
+        }
+
+        /// <summary>왼쪽 위 HUD: ● REC, 지금 에피소드.</summary>
+        static void CreateHud(Transform canvas)
+        {
+            var hud = K.Rect("Hud", canvas);
+            K.Place(hud, K.TopLeft, new Vector2(34, -26), new Vector2(700, 70));
+            var dot = K.Sprite("RecDot", hud, "ui_dot", UITheme.Danger);
+            K.Place(dot.rectTransform, K.TopLeft, new Vector2(-2, -2), new Vector2(18, 18));
+            var rec = K.Mono("Rec", hud, "REC", 14, UITheme.TextDim, TextAlignmentOptions.Left, 26f);
+            K.Place(rec.rectTransform, K.TopLeft, new Vector2(24, -1), new Vector2(200, 20));
+            var ep = K.Mono("Episode", hud, "", 17, UITheme.PeriwinkleBright, TextAlignmentOptions.Left, 14f);
+            K.Place(ep.rectTransform, K.TopLeft, new Vector2(0, -30), new Vector2(700, 26));
+            var panel = hud.gameObject.AddComponent<HudPanel>();
+            K.SetField(panel, "recDot", dot);
+            K.SetField(panel, "episodeText", ep);
+        }
+
+        /// <summary>오른쪽 위 버튼: [AUTO][SKIP][LOG] (대사 중에만) [MENU].</summary>
+        static RectTransform CreateQuickBar(Transform canvas, GameObject dialogueBox, out Button menuButton, out DialogueQuickMenu quickMenu)
+        {
+            var bar = K.Rect("QuickBar", canvas);
+            K.Place(bar, K.TopRight, new Vector2(-30, -26), new Vector2(320, 58));
+            var layout = bar.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 10;
+            layout.childAlignment = TextAnchor.UpperRight;
+            layout.childControlWidth = layout.childControlHeight = true;
+            layout.childForceExpandWidth = layout.childForceExpandHeight = false;
+
+            var group = K.Rect("DialogueButtons", bar);
+            var groupLayout = group.gameObject.AddComponent<HorizontalLayoutGroup>();
+            groupLayout.spacing = 10;
+            groupLayout.childControlWidth = groupLayout.childControlHeight = true;
+            groupLayout.childForceExpandWidth = groupLayout.childForceExpandHeight = false;
+            var groupCanvas = group.gameObject.AddComponent<CanvasGroup>();
+            var size = new Vector2(62, 58);
+            var auto = K.IconButton("AutoButton", group, "icon_auto", "AUTO", size);
+            var skip = K.IconButton("SkipButton", group, "icon_skip", "SKIP", size);
+            var log = K.IconButton("LogButton", group, "icon_log", "LOG", size);
+            menuButton = K.IconButton("MenuButton", bar, "icon_menu", "MENU", new Vector2(68, 58));
+
+            quickMenu = bar.gameObject.AddComponent<DialogueQuickMenu>();
+            K.SetField(quickMenu, "logButton", log);
+            K.SetField(quickMenu, "autoButton", auto);
+            K.SetField(quickMenu, "skipButton", skip);
+            K.SetField(quickMenu, "dialogueBox", dialogueBox);
+            K.SetField(quickMenu, "dialogueGroup", groupCanvas);
+            return bar;
+        }
+
+        // ================================================================ 일시정지와 그 위의 창들
+
+        /// <summary>일시정지 메뉴와 그 위에 뜨는 창들(대사 기록, 세이브 슬롯, 설정, 확인창, 알림). 대사 기록을 만들었으면 돌려준다.</summary>
         static BacklogPanel CreatePauseCanvas(Button menuButton, bool withBacklog)
         {
-            var pauseCanvas = CreateCanvas("PauseCanvas", 50);
-            var pausePanel = CreateImage("PausePanel", pauseCanvas.transform, new Color(0, 0, 0, 0.78f), raycast: true);
-            Stretch(pausePanel.rectTransform);
-            var pauseTitle = CreateText("Title", pausePanel.transform, "일시정지", 60, ColText, TextAlignmentOptions.Center);
-            pauseTitle.fontStyle = FontStyles.Bold;
-            SetRect(pauseTitle.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 370), new Vector2(800, 90));
-            var pauseList = CreateVerticalList("Buttons", pausePanel.transform, new Vector2(0, -30), 440);
-            var resumeButton = CreateButton("ResumeButton", pauseList, "계속하기", 32, 72);
-            var backlogButton = withBacklog ? CreateButton("BacklogButton", pauseList, "대사 기록", 32, 72) : null;
-            var saveButton = CreateButton("SaveButton", pauseList, "저장", 32, 72);
-            var loadButton = CreateButton("LoadButton", pauseList, "불러오기", 32, 72);
-            var settingsButton = CreateButton("SettingsButton", pauseList, "설정", 32, 72);
-            var titleButton = CreateButton("TitleButton", pauseList, "타이틀로", 32, 72);
-            var quitButton = CreateButton("QuitButton", pauseList, "게임 종료", 32, 72);
+            var canvas = CreateCanvas("PauseCanvas", 50);
 
-            // 그리는 순서 = 만든 순서. 메뉴 위에 대사 기록, 슬롯, 설정이 뜬다.
-            var backlog = withBacklog ? CreateBacklogPanel(pauseCanvas) : null;
-            var slots = CreateSaveSlotPanel(pauseCanvas);
-            var settings = CreateSettingsPanel(pauseCanvas);
+            int items = withBacklog ? 7 : 6;
+            var win = K.CreateWindow(canvas.transform, "PausePanel", new Vector2(640, 124 + 20 + items * 66 + 26), "SIGNAL INTERRUPTED", "PAUSED", "일시정지", closeButton: false);
+            var list = K.Rect("Items", win.body);
+            K.Stretch(list, 22, 26, 22, 20);
+            var listLayout = list.gameObject.AddComponent<VerticalLayoutGroup>();
+            listLayout.childControlWidth = listLayout.childControlHeight = true;
+            listLayout.childForceExpandWidth = true;
+            listLayout.childForceExpandHeight = false;
+            var resume = PauseItem(list, "계속하기", "RESUME");
+            var backlogButton = withBacklog ? PauseItem(list, "대사 기록", "BACKLOG") : null;
+            var save = PauseItem(list, "저장", "SAVE");
+            var load = PauseItem(list, "불러오기", "LOAD");
+            var settingsButton = PauseItem(list, "설정", "SETTINGS");
+            var title = PauseItem(list, "타이틀로", "TO TITLE");
+            var quit = PauseItem(list, "게임 종료", "QUIT", danger: true);
+            K.SetValue(win.anim, "showScale", sp => sp.floatValue = 0.94f);
+            K.SetValue(win.anim, "showOffset", sp => sp.vector2Value = new Vector2(0, -26));
+            K.SetValue(win.anim, "popEase", sp => sp.boolValue = true);
+            K.SetValue(win.anim, "showTime", sp => sp.floatValue = 0.32f);
+            K.SetField(win.anim, "staggerRoot", list);
 
-            var pause = pauseCanvas.gameObject.AddComponent<PauseMenu>();
-            SetField(pause, "panel", pausePanel.gameObject);
-            SetField(pause, "openButton", menuButton);
-            SetField(pause, "resumeButton", resumeButton);
-            SetField(pause, "backlogButton", backlogButton);
-            SetField(pause, "saveButton", saveButton);
-            SetField(pause, "loadButton", loadButton);
-            SetField(pause, "settingsButton", settingsButton);
-            SetField(pause, "titleButton", titleButton);
-            SetField(pause, "quitButton", quitButton);
-            SetField(pause, "settings", settings);
-            SetField(pause, "slots", slots);
-            SetField(pause, "backlog", backlog);
+            // 그리는 순서 = 만든 순서. 메뉴 위에 대사 기록, 슬롯, 설정, 확인창, 알림이 뜬다.
+            var backlog = withBacklog ? CreateBacklogPanel(canvas) : null;
+            var confirm = CreateConfirmDialog(canvas);
+            var slots = CreateSaveSlotPanel(canvas, confirm);
+            var settings = CreateSettingsPanel(canvas);
+            CreateToast(canvas);
+
+            var pause = canvas.gameObject.AddComponent<PauseMenu>();
+            K.SetField(pause, "panel", win.anim);
+            K.SetField(pause, "openButton", menuButton);
+            K.SetField(pause, "resumeButton", resume);
+            K.SetField(pause, "backlogButton", backlogButton);
+            K.SetField(pause, "saveButton", save);
+            K.SetField(pause, "loadButton", load);
+            K.SetField(pause, "settingsButton", settingsButton);
+            K.SetField(pause, "titleButton", title);
+            K.SetField(pause, "quitButton", quit);
+            K.SetField(pause, "settings", settings);
+            K.SetField(pause, "slots", slots);
+            K.SetField(pause, "backlog", backlog);
+            K.SetField(pause, "confirm", confirm);
             return backlog;
         }
 
-        // ================================================================ 대사 기록 (4-7)
+        /// <summary>
+        /// 일시정지 메뉴 항목: 한글 + 오른쪽 영문. 마우스를 올리면 왼쪽 막대, 옅은 강조 띠, ▸가 나타나고 글자가 오른쪽으로 밀린다.
+        /// </summary>
+        static Button PauseItem(Transform list, string kr, string en, bool danger = false)
+        {
+            var root = K.Img("Item_" + en.Replace(' ', '_'), list, new Color(0, 0, 0, 0), raycast: true);
+            root.gameObject.AddComponent<LayoutElement>().preferredHeight = 66;
+            var button = root.gameObject.AddComponent<Button>();
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic = root;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+
+            var accent = danger ? UITheme.Danger : UITheme.Periwinkle;
+            var highlight = K.Sprite("Highlight", root.transform, "ui_grad_h", accent.WithAlpha(0.09f));
+            K.Stretch(highlight.rectTransform);
+            var bar = K.Img("Bar", root.transform, accent);
+            bar.rectTransform.anchorMin = new Vector2(0, 0);
+            bar.rectTransform.anchorMax = new Vector2(0, 1);
+            bar.rectTransform.pivot = new Vector2(0, 0.5f);
+            bar.rectTransform.sizeDelta = new Vector2(3, 0);
+            var arrow = K.Sprite("Arrow", root.transform, "ui_tri", accent);
+            K.Place(arrow.rectTransform, K.Left, new Vector2(16, 0), new Vector2(11, 13));
+            var label = K.Text("Label", root.transform, kr, 29, danger ? UITheme.Hex("#D9A5A5") : UITheme.Text, TextAlignmentOptions.Left, spacing: 16f);
+            K.Place(label.rectTransform, K.Left, new Vector2(22, 0), new Vector2(380, 56));
+            var enText = K.Mono("En", root.transform, en, 13, UITheme.TextDim, TextAlignmentOptions.Right, 24f);
+            K.Place(enText.rectTransform, K.Right, new Vector2(-20, 0), new Vector2(220, 24));
+
+            // 마우스를 올리면 ▸가 나타나고 글자는 그만큼 오른쪽으로 비켜 준다.
+            var hover = root.gameObject.AddComponent<UIHoverFx>();
+            K.SetArray(hover, "reveal", new Object[] { highlight, bar, arrow });
+            K.SetArray(hover, "shift", new Object[] { label.rectTransform });
+            K.SetValue(hover, "shiftBy", sp => sp.vector2Value = new Vector2(18, 0));
+            K.SetArray(hover, "tint", new Object[] { label });
+            K.SetValue(hover, "hoverColor", sp => sp.colorValue = danger ? UITheme.Hex("#F2B7B7") : UITheme.TextBright);
+            K.SetArray(hover, "lineTint", new Object[] { enText });
+            K.SetValue(hover, "lineHoverColor", sp => sp.colorValue = danger ? UITheme.Hex("#F2B7B7") : UITheme.PeriwinkleBright);
+            return button;
+        }
+
+        // ================================================================ 대사 기록
 
         static BacklogPanel CreateBacklogPanel(Canvas canvas)
         {
-            var root = CreateImage("BacklogPanel", canvas.transform, new Color(0.02f, 0.02f, 0.03f, 0.975f), raycast: true);
-            Stretch(root.rectTransform);
-            var band = CreateImage("AccentBand", root.transform, ColAccent);
-            band.gameObject.AddComponent<UISkew>().Skew = 120f;
-            SetRect(band.rectTransform, new Vector2(0, 0), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(60, 0), new Vector2(26, 0));
-            var title = CreateText("Title", root.transform, "대사 기록", 52, ColText, TextAlignmentOptions.Left);
-            title.fontStyle = FontStyles.Bold;
-            SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(170, -48), new Vector2(600, 80));
-            var hint = CreateText("Hint", root.transform, "휠 · 드래그: 스크롤     오른쪽 클릭 · L · Esc · 맨 아래에서 휠 아래로: 닫기", 24, ColSubText, TextAlignmentOptions.Left);
-            SetRect(hint.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(176, -128), new Vector2(1300, 40));
-            var close = CreateButton("CloseButton", root.transform, "닫기", 28, 0, skew: 16f);
-            SetRect((RectTransform)close.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-60, -50), new Vector2(200, 64));
+            var win = K.CreateWindow(canvas.transform, "BacklogPanel", new Vector2(1220, 840), "RECOVERED TRANSMISSION", "BACKLOG", "기록", closeButton: true);
 
-            // 스크롤 영역
-            var area = CreateRect("Scroll", root.transform);
-            Stretch(area);
-            area.offsetMin = new Vector2(170, 50);
-            area.offsetMax = new Vector2(-170, -190);
+            var area = K.Rect("Scroll", win.body);
+            K.Stretch(area, 40, 22, 30, 14);
             var scroll = area.gameObject.AddComponent<ScrollRect>();
-            var viewport = CreateImage("Viewport", area, Color.clear, raycast: true); // 휠과 드래그를 받으려면 레이캐스트 대상이 있어야 한다
-            Stretch(viewport.rectTransform);
-            viewport.rectTransform.offsetMax = new Vector2(-34, 0);
+            var viewport = K.Img("Viewport", area, Color.clear, raycast: true); // 휠과 드래그를 받으려면 레이캐스트 대상이 있어야 한다
+            K.Stretch(viewport.rectTransform, 0, 0, 22, 0);
             viewport.gameObject.AddComponent<RectMask2D>();
-            var content = CreateRect("Content", viewport.transform);
+            var content = K.Rect("Content", viewport.transform);
             content.anchorMin = new Vector2(0, 1);
             content.anchorMax = new Vector2(1, 1);
             content.pivot = new Vector2(0.5f, 1);
             content.offsetMin = content.offsetMax = Vector2.zero;
             var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 30;
-            layout.padding = new RectOffset(10, 10, 10, 40);
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
+            layout.padding = new RectOffset(4, 10, 0, 20);
+            layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
             content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var entry = CreateText("EntryTemplate", content, "이름\n대사", 32, ColText, TextAlignmentOptions.TopLeft);
-            entry.lineSpacing = 10;
+
+            // 기록 한 줄: ▸ 이름 // 칩 / 대사 / 아래 구분선
+            var entry = K.Rect("EntryTemplate", content);
+            entry.gameObject.AddComponent<CanvasGroup>();
+            var entryLayout = entry.gameObject.AddComponent<VerticalLayoutGroup>();
+            entryLayout.padding = new RectOffset(6, 6, 18, 22);
+            entryLayout.spacing = 8;
+            entryLayout.childControlWidth = entryLayout.childControlHeight = true;
+            entryLayout.childForceExpandWidth = true;
+            entryLayout.childForceExpandHeight = false;
+            var nameRow = K.Rect("NameRow", entry);
+            nameRow.gameObject.AddComponent<LayoutElement>().preferredHeight = 24;
+            var marker = K.Sprite("Marker", nameRow, "ui_tri", UITheme.Periwinkle);
+            K.Place(marker.rectTransform, K.Left, new Vector2(0, 0), new Vector2(9, 11));
+            var nameText = K.Mono("Name", nameRow, "이름", 16, UITheme.PeriwinkleBright, TextAlignmentOptions.Left, 16f);
+            K.SetRect(nameText.rectTransform, K.BottomLeft, K.TopRight, K.Left, new Vector2(20, 0), new Vector2(-20, 0));
+            var body = K.Text("Body", entry, "대사", 26, UITheme.Text, TextAlignmentOptions.TopLeft, spacing: 1f);
+            body.lineSpacing = 14;
+            var sep = K.Img("Separator", entry, UITheme.LineDim);
+            sep.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            K.SetRect(sep.rectTransform, K.BottomLeft, K.BottomRight, K.Bottom, Vector2.zero, new Vector2(0, 2));
+            var entryView = entry.gameObject.AddComponent<BacklogEntry>();
+            K.SetField(entryView, "nameRow", nameRow.gameObject);
+            K.SetField(entryView, "marker", marker);
+            K.SetField(entryView, "nameText", nameText);
+            K.SetField(entryView, "bodyText", body);
+
+            var empty = K.Text("Empty", win.body, "아직 기록된 대사가 없습니다.", 24, UITheme.TextDim, TextAlignmentOptions.Center);
+            K.Stretch(empty.rectTransform);
 
             var barGo = DefaultControls.CreateScrollbar(new DefaultControls.Resources());
             barGo.name = "Scrollbar";
             SetLayerRecursive(barGo, LayerMask.NameToLayer("UI"));
             barGo.transform.SetParent(area, false);
-            SetRect((RectTransform)barGo.transform, new Vector2(1, 0), new Vector2(1, 1), new Vector2(1, 0.5f), Vector2.zero, new Vector2(12, 0));
+            K.SetRect((RectTransform)barGo.transform, K.BottomRight, K.TopRight, K.Right, Vector2.zero, new Vector2(5, 0));
             var bar = barGo.GetComponent<Scrollbar>();
             bar.direction = Scrollbar.Direction.BottomToTop;
-            barGo.GetComponent<Image>().color = Hex("#2B2F38");
-            bar.targetGraphic.color = ColAccent;
+            barGo.GetComponent<Image>().color = new Color(0, 0, 0, 0);
+            bar.targetGraphic.color = UITheme.Periwinkle;
+            bar.navigation = new Navigation { mode = Navigation.Mode.None };
 
             scroll.content = content;
             scroll.viewport = viewport.rectTransform;
@@ -368,83 +585,211 @@ namespace ProjectVita.EditorTools
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.scrollSensitivity = 60;
             scroll.verticalScrollbar = bar;
-            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
             var panel = canvas.gameObject.AddComponent<BacklogPanel>();
-            SetField(panel, "root", root.gameObject);
-            SetField(panel, "scroll", scroll);
-            SetField(panel, "content", content);
-            SetField(panel, "entryTemplate", entry);
-            SetField(panel, "closeButton", close);
+            K.SetField(panel, "panel", win.anim);
+            K.SetField(panel, "scroll", scroll);
+            K.SetField(panel, "content", content);
+            K.SetField(panel, "entryTemplate", entryView);
+            K.SetField(panel, "emptyLabel", empty.gameObject);
+            K.SetField(panel, "closeButton", win.close);
             return panel;
         }
 
-        // ================================================================ 세이브 슬롯 (4-7, 타이틀과 일시정지 공용)
+        // ================================================================ 세이브 슬롯 (타이틀과 일시정지 공용)
 
-        static SaveSlotPanel CreateSaveSlotPanel(Canvas canvas)
+        static SaveSlotPanel CreateSaveSlotPanel(Canvas canvas, ConfirmDialog confirm)
         {
-            var root = CreateImage("SaveSlotPanel", canvas.transform, new Color(0, 0, 0, 0.85f), raycast: true);
-            Stretch(root.rectTransform);
-            var window = CreateImage("Window", root.transform, ColPanel, raycast: true);
-            SetRect(window.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1720, 960));
-            var accent = CreateImage("AccentLine", window.transform, ColAccent);
-            SetRect(accent.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(0, 6));
-
-            var title = CreateText("Title", window.transform, "저장", 48, ColText, TextAlignmentOptions.Left);
-            title.fontStyle = FontStyles.Bold;
-            SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(60, -36), new Vector2(500, 70));
-            var hint = CreateText("Hint", window.transform, "", 24, ColSubText, TextAlignmentOptions.Left);
-            SetRect(hint.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(60, -106), new Vector2(1300, 40));
-            var close = CreateButton("CloseButton", window.transform, "닫기", 28, 0, skew: 16f);
-            SetRect((RectTransform)close.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-50, -40), new Vector2(200, 64));
+            var win = K.CreateWindow(canvas.transform, "SaveSlotPanel", new Vector2(1420, 930), "DATA ARCHIVE", "SAVE", "저장", closeButton: true);
 
             // 2열 x 4행 = 자동 저장 + 슬롯 7개
-            var grid = CreateRect("Grid", window.transform);
-            SetRect(grid, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(60, -170), new Vector2(1600, 760));
+            var grid = K.Rect("Grid", win.body);
+            K.SetRect(grid, K.Top, K.Top, K.Top, new Vector2(0, -26), new Vector2(1324, 734));
             var gridLayout = grid.gameObject.AddComponent<GridLayoutGroup>();
-            gridLayout.cellSize = new Vector2(784, 172);
-            gridLayout.spacing = new Vector2(32, 24);
+            gridLayout.cellSize = new Vector2(650, 170);
+            gridLayout.spacing = new Vector2(24, 18);
             gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             gridLayout.constraintCount = 2;
+            K.SetField(win.anim, "staggerRoot", grid);
+            K.SetValue(win.anim, "staggerStep", sp => sp.floatValue = 0.04f);
 
-            var cardButton = CreateButton("SlotTemplate", grid, "슬롯", 28, 0);
-            var cardTitle = cardButton.GetComponentInChildren<TMP_Text>();
-            cardTitle.name = "Title";
-            cardTitle.alignment = TextAlignmentOptions.TopLeft;
-            SetRect(cardTitle.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(292, -16), new Vector2(470, 40));
-            var thumb = CreateRect("Thumbnail", cardButton.transform).gameObject.AddComponent<RawImage>();
+            var fill = K.CutPanel("SlotTemplate", grid, 10, Color.white, UITheme.LineDim, raycast: true);
+            var button = fill.gameObject.AddComponent<Button>();
+            button.targetGraphic = fill;
+            K.Colors(button, UITheme.SlotFill, UITheme.SlotHover, new Color32(28, 33, 46, 250));
+            var line = fill.transform.Find("Line").GetComponent<Image>();
+            var content = K.Rect("Content", fill.transform);
+            K.Stretch(content);
+            // 흐리게 하기는 안쪽 묶음에. 카드 자체의 알파는 창이 열릴 때 차례로 나타나는 애니메이션이 쓴다.
+            var group = content.gameObject.AddComponent<CanvasGroup>();
+
+            var thumb = K.Rect("Thumbnail", content).gameObject.AddComponent<RawImage>();
             thumb.raycastTarget = false;
-            SetRect(thumb.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(16, 0), new Vector2(256, 144));
-            var thumbLabel = CreateText("ThumbnailLabel", thumb.transform, "", 22, ColSubText, TextAlignmentOptions.Center);
-            Stretch(thumbLabel.rectTransform);
-            var info = CreateText("Info", cardButton.transform, "", 22, ColText, TextAlignmentOptions.TopLeft);
-            info.overflowMode = TextOverflowModes.Ellipsis;
-            info.lineSpacing = 4;
-            SetRect(info.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(292, -58), new Vector2(470, 104));
-            var card = cardButton.gameObject.AddComponent<SaveSlotCard>();
-            SetField(card, "button", cardButton);
-            SetField(card, "thumbnail", thumb);
-            SetField(card, "thumbnailLabel", thumbLabel);
-            SetField(card, "title", cardTitle);
-            SetField(card, "info", info);
+            K.Place(thumb.rectTransform, K.Left, new Vector2(16, 0), new Vector2(240, 135));
+            var thumbLine = thumb.gameObject.AddComponent<Outline>();
+            thumbLine.effectColor = UITheme.LineDim;
+            thumbLine.effectDistance = new Vector2(1, -1);
+            var thumbLabel = K.Mono("ThumbnailLabel", thumb.transform, "", 13, UITheme.TextDim, TextAlignmentOptions.Center, 20f);
+            K.Stretch(thumbLabel.rectTransform);
+
+            float x = 276;
+            var slotText = K.Mono("Slot", content, "SLOT 01", 14, UITheme.Amber, TextAlignmentOptions.Left, 26f);
+            K.Place(slotText.rectTransform, K.TopLeft, new Vector2(x, -16), new Vector2(240, 20));
+            var status = K.Mono("Status", content, "EMPTY", 14, UITheme.Amber, TextAlignmentOptions.Right, 26f);
+            K.Place(status.rectTransform, K.TopRight, new Vector2(-22, -16), new Vector2(140, 20));
+            var chapter = K.Text("Chapter", content, "—", 24, UITheme.Text, TextAlignmentOptions.Left, spacing: 5f);
+            chapter.textWrappingMode = TextWrappingModes.NoWrap;
+            chapter.overflowMode = TextOverflowModes.Ellipsis;
+            K.Place(chapter.rectTransform, K.TopLeft, new Vector2(x, -44), new Vector2(352, 34));
+            var preview = K.Text("Preview", content, "", 19, UITheme.TextDim, TextAlignmentOptions.TopLeft, spacing: 1f);
+            preview.overflowMode = TextOverflowModes.Ellipsis;
+            preview.lineSpacing = 8;
+            K.Place(preview.rectTransform, K.TopLeft, new Vector2(x, -82), new Vector2(352, 54));
+            var time = K.Mono("Time", content, "", 13, UITheme.Periwinkle, TextAlignmentOptions.Left, 12f);
+            K.Place(time.rectTransform, K.BottomLeft, new Vector2(x, 14), new Vector2(260, 20));
+            var badge = K.Mono("Badge", content, "OVERWRITE", 12, UITheme.Cyan, TextAlignmentOptions.Right, 20f);
+            K.Place(badge.rectTransform, K.BottomRight, new Vector2(-22, 14), new Vector2(160, 20));
+
+            var hover = fill.gameObject.AddComponent<UIHoverFx>();
+            K.SetArray(hover, "shift", new Object[] { content });
+            K.SetValue(hover, "shiftBy", sp => sp.vector2Value = new Vector2(0, 3));
+            K.SetArray(hover, "lineTint", new Object[] { line });
+            K.SetValue(hover, "lineHoverColor", sp => sp.colorValue = UITheme.Cyan.WithAlpha(0.42f));
+
+            var card = fill.gameObject.AddComponent<SaveSlotCard>();
+            K.SetField(card, "button", button);
+            K.SetField(card, "group", group);
+            K.SetField(card, "thumbnail", thumb);
+            K.SetField(card, "thumbnailLabel", thumbLabel);
+            K.SetField(card, "slotText", slotText);
+            K.SetField(card, "statusText", status);
+            K.SetField(card, "chapterText", chapter);
+            K.SetField(card, "previewText", preview);
+            K.SetField(card, "timeText", time);
+            K.SetField(card, "badgeText", badge);
 
             var panel = canvas.gameObject.AddComponent<SaveSlotPanel>();
-            SetField(panel, "root", root.gameObject);
-            SetField(panel, "titleText", title);
-            SetField(panel, "hintText", hint);
-            SetField(panel, "grid", grid);
-            SetField(panel, "cardTemplate", card);
-            SetField(panel, "closeButton", close);
+            K.SetField(panel, "panel", win.anim);
+            K.SetField(panel, "eyebrowText", win.eyebrow);
+            K.SetField(panel, "titleText", win.title);
+            K.SetField(panel, "grid", grid);
+            K.SetField(panel, "cardTemplate", card);
+            K.SetField(panel, "closeButton", win.close);
+            K.SetField(panel, "confirm", confirm);
             return panel;
+        }
+
+        // ================================================================ 설정 (타이틀과 일시정지 공용)
+
+        static SettingsPanel CreateSettingsPanel(Canvas canvas)
+        {
+            var win = K.CreateWindow(canvas.transform, "SettingsPanel", new Vector2(900, 940), "SYSTEM CONFIG", "SETTINGS", "설정", closeButton: true);
+            K.SetValue(win.anim, "showScale", sp => sp.floatValue = 1f);
+            K.SetValue(win.anim, "showOffset", sp => sp.vector2Value = new Vector2(0, -12));
+            K.SetValue(win.anim, "showTime", sp => sp.floatValue = 0.3f);
+
+            var list = K.Rect("Rows", win.body);
+            K.Stretch(list, 52, 20, 52, 8);
+            var layout = list.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.childControlWidth = layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            K.GroupLabel(list, "TEXT / 텍스트");
+            var (speed, speedValue) = K.Slider(K.SettingRow(list, "텍스트 속도", "TYPE SPEED"));
+            var (auto, autoValue) = K.Slider(K.SettingRow(list, "자동 진행 속도", "AUTO SPEED"));
+            var skipRead = K.Toggle(K.SettingRow(list, "읽은 대사만 건너뛰기", "SKIP READ ONLY"));
+            K.GroupLabel(list, "DISPLAY / 화면");
+            var scan = K.Toggle(K.SettingRow(list, "CRT 스캔라인", "SCANLINES"));
+            var grain = K.Toggle(K.SettingRow(list, "필름 노이즈", "FILM GRAIN"));
+            var shake = K.Toggle(K.SettingRow(list, "화면 흔들림", "SCREEN SHAKE"));
+            var full = K.Toggle(K.SettingRow(list, "전체 화면", "FULLSCREEN"));
+            K.GroupLabel(list, "AUDIO / 사운드");
+            var (bgm, bgmValue) = K.Slider(K.SettingRow(list, "음량 — 배경 음악", "BGM"));
+            var (sfx, sfxValue) = K.Slider(K.SettingRow(list, "음량 — 효과음", "SFX"));
+            var noteRow = K.Rect("Note", list);
+            noteRow.gameObject.AddComponent<LayoutElement>().preferredHeight = 44;
+            var note = K.Mono("Text", noteRow, "* 설정은 바로 적용되고 자동으로 저장됩니다.", 13, UITheme.TextFaint, TextAlignmentOptions.BottomLeft, 10f);
+            K.Stretch(note.rectTransform);
+            K.SetField(win.anim, "staggerRoot", list);
+            K.SetValue(win.anim, "staggerStep", sp => sp.floatValue = 0.025f);
+
+            var panel = canvas.gameObject.AddComponent<SettingsPanel>();
+            K.SetField(panel, "panel", win.anim);
+            K.SetField(panel, "textSpeedSlider", speed);
+            K.SetField(panel, "textSpeedValue", speedValue);
+            K.SetField(panel, "autoSpeedSlider", auto);
+            K.SetField(panel, "autoSpeedValue", autoValue);
+            K.SetField(panel, "skipReadOnlyToggle", skipRead);
+            K.SetField(panel, "scanlinesToggle", scan);
+            K.SetField(panel, "filmGrainToggle", grain);
+            K.SetField(panel, "screenShakeToggle", shake);
+            K.SetField(panel, "fullscreenToggle", full);
+            K.SetField(panel, "bgmSlider", bgm);
+            K.SetField(panel, "bgmValue", bgmValue);
+            K.SetField(panel, "sfxSlider", sfx);
+            K.SetField(panel, "sfxValue", sfxValue);
+            K.SetField(panel, "closeButton", win.close);
+            return panel;
+        }
+
+        // ================================================================ 확인창, 알림
+
+        static ConfirmDialog CreateConfirmDialog(Canvas canvas)
+        {
+            var win = K.CreateWindow(canvas.transform, "ConfirmPanel", new Vector2(660, 360), "CONFIRM", "CONFIRM", "확인", closeButton: false);
+            K.SetValue(win.anim, "showScale", sp => sp.floatValue = 0.95f);
+            K.SetValue(win.anim, "popEase", sp => sp.boolValue = true);
+            var message = K.Text("Message", win.body, "메시지", 26, UITheme.Text, TextAlignmentOptions.TopLeft, spacing: 4f);
+            message.lineSpacing = 18;
+            K.Stretch(message.rectTransform, 48, 100, 48, 30);
+
+            var no = K.Button("NoButton", win.body, "아니오", 24, 0, cut: 6);
+            K.Place((RectTransform)no.transform, K.BottomRight, new Vector2(-218, 30), new Vector2(160, 56));
+            var yesFill = K.Sprite("YesButton", win.body, "ui_cut6_fill", UITheme.Periwinkle, sliced: true, raycast: true);
+            K.Place(yesFill.rectTransform, K.BottomRight, new Vector2(-40, 30), new Vector2(160, 56));
+            var yes = yesFill.gameObject.AddComponent<Button>();
+            yes.targetGraphic = yesFill;
+            K.Colors(yes, Color.white, new Color(1.0f, 1.0f, 1.0f, 0.82f), new Color(0.85f, 0.85f, 0.9f, 1f));
+            var yesLabel = K.Text("Label", yesFill.transform, "예", 24, UITheme.Hex("#0A0B10"), TextAlignmentOptions.Center, spacing: 10f);
+            yesLabel.fontStyle = FontStyles.Bold;
+            K.Stretch(yesLabel.rectTransform);
+
+            var dialog = canvas.gameObject.AddComponent<ConfirmDialog>();
+            K.SetField(dialog, "panel", win.anim);
+            K.SetField(dialog, "eyebrowText", win.eyebrow);
+            K.SetField(dialog, "titleText", win.title);
+            K.SetField(dialog, "messageText", message);
+            K.SetField(dialog, "yesButton", yes);
+            K.SetField(dialog, "yesLabel", yesLabel);
+            K.SetField(dialog, "yesFill", yesFill);
+            K.SetField(dialog, "noButton", no);
+            return dialog;
+        }
+
+        static void CreateToast(Canvas canvas)
+        {
+            var root = K.Rect("Toast", canvas.transform);
+            K.Stretch(root);
+            var group = root.gameObject.AddComponent<CanvasGroup>();
+            var box = K.CutPanel("Box", root, 6, UITheme.Panel2, UITheme.Line);
+            K.Place(box.rectTransform, K.Bottom, new Vector2(0, 300), new Vector2(560, 62));
+            var text = K.Text("Text", box.transform, "", 22, UITheme.PeriwinkleBright, TextAlignmentOptions.Center, spacing: 12f);
+            K.Stretch(text.rectTransform, 16, 4, 16, 4);
+            var toast = root.gameObject.AddComponent<UIToast>();
+            K.SetField(toast, "group", group);
+            K.SetField(toast, "box", box.rectTransform);
+            K.SetField(toast, "text", text);
         }
 
         static void CreateDevCanvas()
         {
             var devCanvas = CreateCanvas("DevCanvas", 100);
-            var devText = CreateText("DevOverlay", devCanvas.transform, "", 20, ColDev, TextAlignmentOptions.TopLeft);
-            SetRect(devText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(20, -16), new Vector2(1100, 420));
+            var devText = K.Text("DevOverlay", devCanvas.transform, "", 18, ColDev, TextAlignmentOptions.TopLeft);
+            K.SetRect(devText.rectTransform, K.TopLeft, K.TopLeft, K.TopLeft, new Vector2(34, -112), new Vector2(1000, 400));
             var overlay = devText.gameObject.AddComponent<DevOverlay>();
-            SetField(overlay, "text", devText);
+            K.SetField(overlay, "text", devText);
         }
 
         // ================================================================ Exploration 씬
@@ -454,67 +799,70 @@ namespace ProjectVita.EditorTools
             var d = BuildDialogueScene(ExplorationScenePath);
 
             // 탐색 UI는 무대 위, 대사창 아래에 둔다.
-            var layer = CreateRect("ExplorationLayer", d.canvas.transform);
-            Stretch(layer);
+            var layer = K.Rect("ExplorationLayer", d.canvas.transform);
+            K.Stretch(layer);
             layer.SetSiblingIndex(d.dialogueBox.GetSiblingIndex());
 
-            var hotspots = CreateRect("Hotspots", layer);
-            Stretch(hotspots);
-            var hotspotTemplate = CreateImage("HotspotTemplate", hotspots, Color.clear, raycast: true);
-            var hotspotLabel = CreateText("Label", hotspotTemplate.transform, "이름", 28, ColText, TextAlignmentOptions.Center);
-            hotspotLabel.fontStyle = FontStyles.Bold;
+            var hotspots = K.Rect("Hotspots", layer);
+            K.Stretch(hotspots);
+            var hotspotTemplate = K.Img("HotspotTemplate", hotspots, Color.clear, raycast: true);
+            var hotspotLabel = K.Text("Label", hotspotTemplate.transform, "이름", 26, UITheme.TextBright, TextAlignmentOptions.Center, spacing: 6f);
             hotspotLabel.outlineWidth = 0.2f;
             hotspotLabel.outlineColor = new Color32(0, 0, 0, 255);
-            SetRect(hotspotLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 0), new Vector2(0, 6), new Vector2(120, 80));
+            K.SetRect(hotspotLabel.rectTransform, K.TopLeft, K.TopRight, K.Bottom, new Vector2(0, 6), new Vector2(120, 80));
             var hotspot = hotspotTemplate.gameObject.AddComponent<ExplorationHotspot>();
-            SetField(hotspot, "fill", hotspotTemplate);
-            SetField(hotspot, "label", hotspotLabel);
+            K.SetField(hotspot, "fill", hotspotTemplate);
+            K.SetField(hotspot, "label", hotspotLabel);
 
-            // 장소 이름 (위쪽 가운데. 왼쪽 위는 개발용 표시 자리)
-            var plate = CreateImage("LocationPlate", layer, ColAccent);
-            plate.gameObject.AddComponent<UISkew>().Skew = 24f;
-            SetRect(plate.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -26), new Vector2(420, 66));
-            var plateText = CreateText("LocationName", plate.transform, "장소", 34, ColText, TextAlignmentOptions.Center);
-            plateText.fontStyle = FontStyles.Bold;
-            Stretch(plateText.rectTransform, 16, 4);
+            // 장소 이름 (위쪽 가운데)
+            var plate = K.CutPanel("LocationPlate", layer, 10, UITheme.Panel, UITheme.Line);
+            K.Place(plate.rectTransform, K.Top, new Vector2(0, -26), new Vector2(460, 78));
+            var plateEyebrow = K.Mono("Eyebrow", plate.transform, "LOCATION", 12, UITheme.Amber, TextAlignmentOptions.Center, 32f);
+            K.Place(plateEyebrow.rectTransform, K.Top, new Vector2(0, -10), new Vector2(400, 18));
+            var plateText = K.Text("LocationName", plate.transform, "장소", 28, UITheme.TextBright, TextAlignmentOptions.Center, spacing: 10f);
+            K.Place(plateText.rectTransform, K.Top, new Vector2(0, -32), new Vector2(420, 38));
 
-            // 지도 버튼 (메뉴 버튼 아래)
-            var mapButton = CreateButton("MapButton", layer, "지도", 26, 0, skew: 14f);
-            SetRect((RectTransform)mapButton.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-28, -86), new Vector2(190, 52));
+            // 지도 버튼 (MENU 아래)
+            var mapButton = K.Button("MapButton", layer, "지도  <size=70%><color=#6C7387>MAP</color></size>", 22, 0, cut: 6);
+            K.Place((RectTransform)mapButton.transform, K.TopRight, new Vector2(-30, -98), new Vector2(180, 50));
 
             // 지도 화면
-            var map = CreateImage("MapView", layer, new Color(0.04f, 0.045f, 0.055f, 0.96f), raycast: true);
-            Stretch(map.rectTransform);
-            var mapTitle = CreateText("Title", map.transform, "지도", 64, ColText, TextAlignmentOptions.Left);
-            mapTitle.fontStyle = FontStyles.Bold;
-            SetRect(mapTitle.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(170, -120), new Vector2(800, 100));
-            var mapHint = CreateText("Hint", map.transform, "갈 곳을 고른다. 조건을 채우면 새 장소가 나타난다.", 26, ColSubText, TextAlignmentOptions.Left);
-            SetRect(mapHint.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(176, -220), new Vector2(1200, 50));
-            var mapBand = CreateImage("AccentBand", map.transform, ColAccent);
-            mapBand.gameObject.AddComponent<UISkew>().Skew = 120f;
-            SetRect(mapBand.rectTransform, new Vector2(0, 0), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(60, 0), new Vector2(26, 0));
-            var mapList = CreateRect("List", map.transform);
-            SetRect(mapList, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(170, -300), new Vector2(560, 0));
+            var map = K.Img("MapView", layer, UITheme.Bg.WithAlpha(0.97f), raycast: true);
+            K.Stretch(map.rectTransform);
+            // 왼쪽 위는 HUD와 개발용 표시 자리라서 지도 내용은 그 아래부터 둔다.
+            var mapBar = K.Sprite("AccentBar", map.transform, "ui_grad_v", UITheme.Periwinkle);
+            mapBar.rectTransform.anchorMin = new Vector2(0, 0);
+            mapBar.rectTransform.anchorMax = new Vector2(0, 1);
+            mapBar.rectTransform.pivot = new Vector2(0, 1);
+            mapBar.rectTransform.anchoredPosition = new Vector2(170, -250);
+            mapBar.rectTransform.sizeDelta = new Vector2(3, -310);
+            var mapEyebrow = K.Mono("Eyebrow", map.transform, "AREA MAP", 15, UITheme.Amber, TextAlignmentOptions.Left, 40f);
+            K.Place(mapEyebrow.rectTransform, K.TopLeft, new Vector2(204, -256), new Vector2(600, 24));
+            var mapTitle = K.Display("Title", map.transform, ConfirmDialog.WindowTitle("MAP", "지도"), 44, UITheme.Hex("#DFE2EC"), TextAlignmentOptions.Left, 20f);
+            K.Place(mapTitle.rectTransform, K.TopLeft, new Vector2(204, -286), new Vector2(900, 64));
+            var mapHint = K.Text("Hint", map.transform, "갈 곳을 고른다. 조건을 채우면 새 장소가 나타난다.", 24, UITheme.TextDim, TextAlignmentOptions.Left, spacing: 4f);
+            K.Place(mapHint.rectTransform, K.TopLeft, new Vector2(206, -360), new Vector2(1200, 40));
+            var mapList = K.Rect("List", map.transform);
+            K.SetRect(mapList, K.TopLeft, K.TopLeft, K.TopLeft, new Vector2(204, -430), new Vector2(560, 0));
             var mapLayout = mapList.gameObject.AddComponent<VerticalLayoutGroup>();
-            mapLayout.spacing = 16;
-            mapLayout.childControlWidth = true;
-            mapLayout.childControlHeight = true;
+            mapLayout.spacing = 14;
+            mapLayout.childControlWidth = mapLayout.childControlHeight = true;
             mapLayout.childForceExpandHeight = false;
             mapList.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var mapItem = CreateButton("MapItemTemplate", mapList, "장소", 34, 88, skew: 22f);
+            var mapItem = K.Button("MapItemTemplate", mapList, "장소", 30, 84, accent: UITheme.Cyan);
 
             var controller = d.system.AddComponent<ExplorationController>();
-            SetField(controller, "runner", d.runner);
-            SetField(controller, "stage", d.stage);
-            SetField(controller, "episodesCsv", episodesCsv);
-            SetField(controller, "hotspotRoot", hotspots);
-            SetField(controller, "hotspotTemplate", hotspot);
-            SetField(controller, "locationPlate", plate.gameObject);
-            SetField(controller, "locationName", plateText);
-            SetField(controller, "mapButton", mapButton);
-            SetField(controller, "mapView", map.gameObject);
-            SetField(controller, "mapListRoot", mapList);
-            SetField(controller, "mapItemTemplate", mapItem);
+            K.SetField(controller, "runner", d.runner);
+            K.SetField(controller, "stage", d.stage);
+            K.SetField(controller, "episodesCsv", episodesCsv);
+            K.SetField(controller, "hotspotRoot", hotspots);
+            K.SetField(controller, "hotspotTemplate", hotspot);
+            K.SetField(controller, "locationPlate", plate.gameObject);
+            K.SetField(controller, "locationName", plateText);
+            K.SetField(controller, "mapButton", mapButton);
+            K.SetField(controller, "mapView", map.gameObject);
+            K.SetField(controller, "mapListRoot", mapList);
+            K.SetField(controller, "mapItemTemplate", mapItem);
 
             EditorSceneManager.SaveScene(d.scene, ExplorationScenePath);
             Debug.Log("[Setup] Exploration 씬 생성: " + ExplorationScenePath);
@@ -529,22 +877,24 @@ namespace ProjectVita.EditorTools
             CreateEventSystem();
 
             var canvas = CreateCanvas("BattleCanvas", 0);
-            var bg = CreateImage("Background", canvas.transform, Hex("#15181E"));
-            Stretch(bg.rectTransform);
-            var shake = CreateRect("ShakeRoot", canvas.transform);
-            Stretch(shake);
+            var bg = K.Img("Background", canvas.transform, UITheme.Hex("#0E1015"));
+            K.Stretch(bg.rectTransform);
+            var ambient = K.Rect("Ambient", canvas.transform);
+            K.Stretch(ambient);
+            var shake = K.Rect("ShakeRoot", canvas.transform);
+            K.Stretch(shake);
 
             // 적 줄 (위쪽 가운데), 아군 줄 (아래 왼쪽)
-            var enemyRow = CreateRect("EnemyRow", shake);
-            SetRect(enemyRow, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(-120, -90), new Vector2(1300, 560));
+            var enemyRow = K.Rect("EnemyRow", shake);
+            K.SetRect(enemyRow, K.Top, K.Top, K.Top, new Vector2(-120, -100), new Vector2(1300, 560));
             var enemyLayout = enemyRow.gameObject.AddComponent<HorizontalLayoutGroup>();
             enemyLayout.spacing = 40;
             enemyLayout.childAlignment = TextAnchor.MiddleCenter;
             enemyLayout.childControlWidth = false;
             enemyLayout.childControlHeight = false;
 
-            var allyRow = CreateRect("AllyRow", shake);
-            SetRect(allyRow, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 30), new Vector2(1180, 300));
+            var allyRow = K.Rect("AllyRow", shake);
+            K.SetRect(allyRow, K.BottomLeft, K.BottomLeft, K.BottomLeft, new Vector2(40, 30), new Vector2(1180, 300));
             var allyLayout = allyRow.gameObject.AddComponent<HorizontalLayoutGroup>();
             allyLayout.spacing = 20;
             allyLayout.childAlignment = TextAnchor.LowerLeft;
@@ -554,77 +904,77 @@ namespace ProjectVita.EditorTools
             var enemyTemplate = CreateUnitView("EnemyTemplate", enemyRow, new Vector2(360, 540), enemy: true);
             var allyTemplate = CreateUnitView("AllyTemplate", allyRow, new Vector2(380, 290), enemy: false);
 
+            // 분위기 효과 (전투 화면 위, 명령 창 아래)
+            var fxLayer = K.Rect("ScreenFx", canvas.transform);
+            K.Stretch(fxLayer);
+            K.CreateScreenFx(ambient, fxLayer);
+
             // 명령 창 (아래 오른쪽)
-            var panel = CreateImage("CommandPanel", canvas.transform, ColBox, raycast: true);
-            SetRect(panel.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 30), new Vector2(640, 380));
-            var panelAccent = CreateImage("AccentLine", panel.transform, ColAccent);
-            SetRect(panelAccent.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(0, 4));
-            var actor = CreateText("Actor", panel.transform, "행동", 32, ColText, TextAlignmentOptions.Left);
-            actor.fontStyle = FontStyles.Bold;
-            SetRect(actor.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), new Vector2(0, -20), new Vector2(-60, 50));
+            var panel = K.CutPanel("CommandPanel", canvas.transform, 16, UITheme.Panel, UITheme.Line, raycast: true);
+            K.Place(panel.rectTransform, K.BottomRight, new Vector2(-40, 30), new Vector2(640, 380));
+            var panelLine = K.Sprite("TopLine", panel.transform, "ui_grad_h", UITheme.Periwinkle);
+            K.SetRect(panelLine.rectTransform, K.TopLeft, K.TopRight, K.Top, new Vector2(-100, 0), new Vector2(-232, 3));
+            var actor = K.Text("Actor", panel.transform, "행동", 30, UITheme.TextBright, TextAlignmentOptions.Left, spacing: 6f);
+            K.SetRect(actor.rectTransform, K.TopLeft, K.TopRight, K.Top, new Vector2(0, -22), new Vector2(-60, 46));
             var skillButtons = new Button[4];
             for (int i = 0; i < 4; i++)
             {
-                var b = CreateButton("Skill" + (i + 1), panel.transform, "스킬", 26, 0, skew: 14f);
+                var b = K.Button("Skill" + (i + 1), panel.transform, "스킬", 24, 0, cut: 10, accent: UITheme.Cyan);
                 int col = i % 2, row = i / 2;
-                SetRect((RectTransform)b.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(30 + col * 295, -84 - row * 82), new Vector2(285, 72));
+                K.Place((RectTransform)b.transform, K.TopLeft, new Vector2(30 + col * 295, -84 - row * 82), new Vector2(285, 72));
                 skillButtons[i] = b;
             }
-            var info = CreateText("SkillInfo", panel.transform, "", 22, ColSubText, TextAlignmentOptions.TopLeft);
-            SetRect(info.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(-60, 90));
-            var back = CreateButton("BackButton", panel.transform, "뒤로", 22, 0);
-            SetRect((RectTransform)back.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-24, -18), new Vector2(110, 46));
+            var info = K.Text("SkillInfo", panel.transform, "", 21, UITheme.TextDim, TextAlignmentOptions.TopLeft, spacing: 2f);
+            K.SetRect(info.rectTransform, K.BottomLeft, K.BottomRight, K.Bottom, new Vector2(0, 20), new Vector2(-60, 90));
+            var back = K.Button("BackButton", panel.transform, "뒤로", 21, 0, cut: 6);
+            K.Place((RectTransform)back.transform, K.TopRight, new Vector2(-24, -18), new Vector2(110, 46));
 
             // 정보
-            var round = CreateText("Round", canvas.transform, "ROUND 1", 34, ColText, TextAlignmentOptions.Left);
-            round.fontStyle = FontStyles.Bold;
-            SetRect(round.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -28), new Vector2(400, 50));
-            var logText = CreateText("Log", canvas.transform, "", 22, ColSubText, TextAlignmentOptions.TopLeft);
-            SetRect(logText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -86), new Vector2(520, 220));
+            var round = K.Display("Round", canvas.transform, "ROUND 1", 30, UITheme.Hex("#DFE2EC"), TextAlignmentOptions.Left, 20f);
+            K.Place(round.rectTransform, K.TopLeft, new Vector2(40, -30), new Vector2(400, 46));
+            var logText = K.Text("Log", canvas.transform, "", 21, UITheme.TextDim, TextAlignmentOptions.TopLeft, spacing: 2f);
+            K.Place(logText.rectTransform, K.TopLeft, new Vector2(40, -88), new Vector2(520, 220));
 
-            var menuButton = CreateButton("MenuButton", canvas.transform, "메뉴 (Esc)", 24, 0, skew: 14f);
-            SetRect((RectTransform)menuButton.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-28, -22), new Vector2(190, 52));
-            var autoButton = CreateButton("AutoButton", canvas.transform, "자동 전투: 끔", 22, 0, skew: 14f);
-            SetRect((RectTransform)autoButton.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-28, -86), new Vector2(220, 52));
+            var bar = K.Rect("QuickBar", canvas.transform);
+            K.Place(bar, K.TopRight, new Vector2(-30, -26), new Vector2(68, 58));
+            var menuButton = K.IconButton("MenuButton", bar, "icon_menu", "MENU", new Vector2(68, 58));
+            K.Stretch((RectTransform)menuButton.transform);
+            var autoButton = K.Button("AutoButton", canvas.transform, "자동 전투: 끔", 21, 0, cut: 6);
+            K.Place((RectTransform)autoButton.transform, K.TopRight, new Vector2(-30, -98), new Vector2(220, 50));
 
             // 결과
-            var result = CreateImage("ResultPanel", canvas.transform, new Color(0, 0, 0, 0.78f), raycast: true);
-            Stretch(result.rectTransform);
-            var resultText = CreateText("ResultText", result.transform, "승리", 120, ColText, TextAlignmentOptions.Center);
-            resultText.fontStyle = FontStyles.Bold;
-            SetRect(resultText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 80), new Vector2(1000, 180));
-            var resultButton = CreateButton("ResultButton", result.transform, "계속", 34, 0, skew: 22f);
-            SetRect((RectTransform)resultButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -90), new Vector2(360, 84));
+            var result = K.Img("ResultPanel", canvas.transform, UITheme.Overlay, raycast: true);
+            K.Stretch(result.rectTransform);
+            var resultText = K.Display("ResultText", result.transform, "승리", 110, UITheme.TextBright, TextAlignmentOptions.Center, 30f);
+            K.Place(resultText.rectTransform, K.Center, new Vector2(0, 80), new Vector2(1200, 180));
+            var resultButton = K.Button("ResultButton", result.transform, "계속", 30, 0, cut: 10, accent: UITheme.Cyan);
+            K.Place((RectTransform)resultButton.transform, K.Center, new Vector2(0, -90), new Vector2(360, 80));
 
-            var flash = CreateImage("Flash", canvas.transform, Color.white);
-            Stretch(flash.rectTransform);
+            var flash = K.Img("Flash", canvas.transform, Color.white);
+            K.Stretch(flash.rectTransform);
 
             CreatePauseCanvas(menuButton, withBacklog: false);
 
             var controller = canvas.gameObject.AddComponent<BattleController>();
-            SetField(controller, "episodesCsv", episodesCsv);
-            SetField(controller, "background", bg);
-            SetField(controller, "shakeRoot", shake);
-            SetField(controller, "enemyRow", enemyRow);
-            SetField(controller, "allyRow", allyRow);
-            SetField(controller, "enemyTemplate", enemyTemplate);
-            SetField(controller, "allyTemplate", allyTemplate);
-            SetField(controller, "flash", flash);
-            SetField(controller, "commandPanel", panel.gameObject);
-            SetField(controller, "actorText", actor);
-            var so = new SerializedObject(controller);
-            var arr = so.FindProperty("skillButtons");
-            arr.arraySize = 4;
-            for (int i = 0; i < 4; i++) arr.GetArrayElementAtIndex(i).objectReferenceValue = skillButtons[i];
-            so.ApplyModifiedPropertiesWithoutUndo();
-            SetField(controller, "skillInfo", info);
-            SetField(controller, "backButton", back);
-            SetField(controller, "autoButton", autoButton);
-            SetField(controller, "roundText", round);
-            SetField(controller, "logText", logText);
-            SetField(controller, "resultPanel", result.gameObject);
-            SetField(controller, "resultText", resultText);
-            SetField(controller, "resultButton", resultButton);
+            K.SetField(controller, "episodesCsv", episodesCsv);
+            K.SetField(controller, "background", bg);
+            K.SetField(controller, "shakeRoot", shake);
+            K.SetField(controller, "enemyRow", enemyRow);
+            K.SetField(controller, "allyRow", allyRow);
+            K.SetField(controller, "enemyTemplate", enemyTemplate);
+            K.SetField(controller, "allyTemplate", allyTemplate);
+            K.SetField(controller, "flash", flash);
+            K.SetField(controller, "commandPanel", panel.gameObject);
+            K.SetField(controller, "actorText", actor);
+            K.SetArray(controller, "skillButtons", skillButtons);
+            K.SetField(controller, "skillInfo", info);
+            K.SetField(controller, "backButton", back);
+            K.SetField(controller, "autoButton", autoButton);
+            K.SetField(controller, "roundText", round);
+            K.SetField(controller, "logText", logText);
+            K.SetField(controller, "resultPanel", result.gameObject);
+            K.SetField(controller, "resultText", resultText);
+            K.SetField(controller, "resultButton", resultButton);
 
             EditorSceneManager.SaveScene(scene, BattleScenePath);
             Debug.Log("[Setup] Battle 씬 생성: " + BattleScenePath);
@@ -634,60 +984,61 @@ namespace ProjectVita.EditorTools
         static BattleUnitView CreateUnitView(string name, Transform parent, Vector2 size, bool enemy)
         {
             // 바탕은 불투명해야 뒤의 Frame이 테두리로만 보인다.
-            var root = CreateImage(name, parent, ColPanel, raycast: true);
+            var root = K.Img(name, parent, UITheme.Hex("#10131B"), raycast: true);
             root.rectTransform.sizeDelta = size;
             var frame = root.gameObject.AddComponent<Outline>();
-            frame.effectDistance = new Vector2(5, -5);
+            frame.effectDistance = new Vector2(4, -4);
             frame.effectColor = Color.clear;
-            var body = CreateRect("Body", root.transform);
-            Stretch(body);
+            var line = K.Sprite("Line", root.transform, "ui_cut10_line", UITheme.Line, sliced: true);
+            K.Stretch(line.rectTransform);
+            var body = K.Rect("Body", root.transform);
+            K.Stretch(body);
 
-            var portrait = CreateImage("Portrait", body, Color.white);
-            var portraitLabel = CreateText("PortraitLabel", portrait.transform, "", 26, ColSubText, TextAlignmentOptions.Center);
-            Stretch(portraitLabel.rectTransform, 8, 8);
-            var nameText = CreateText("Name", body, "이름", enemy ? 30 : 28, ColText, TextAlignmentOptions.Left);
-            nameText.fontStyle = FontStyles.Bold;
-            var hpBar = CreateImage("HpBar", body, Hex("#2B2F38"));
-            var hpFill = CreateImage("HpFill", hpBar.transform, new Color(0.35f, 0.8f, 0.4f));
+            var portrait = K.Img("Portrait", body, Color.white);
+            var portraitLabel = K.Mono("PortraitLabel", portrait.transform, "", 18, UITheme.TextDim, TextAlignmentOptions.Center, 10f);
+            K.Stretch(portraitLabel.rectTransform, 8, 8, 8, 8);
+            var nameText = K.Text("Name", body, "이름", enemy ? 28 : 26, UITheme.TextBright, TextAlignmentOptions.Left, spacing: 4f);
+            var hpBar = K.Img("HpBar", body, UITheme.Rail);
+            var hpFill = K.Img("HpFill", hpBar.transform, new Color(0.35f, 0.8f, 0.4f));
             hpFill.rectTransform.anchorMin = Vector2.zero;
             hpFill.rectTransform.anchorMax = Vector2.one;
             hpFill.rectTransform.offsetMin = hpFill.rectTransform.offsetMax = Vector2.zero;
-            var hpText = CreateText("HpText", body, "0 / 0", 22, ColText, TextAlignmentOptions.Right);
-            var infoText = CreateText("Info", body, "", 20, ColSubText, TextAlignmentOptions.TopLeft);
-            var popup = CreateText("Popup", body, "0", 56, Color.white, TextAlignmentOptions.Center);
+            var hpText = K.Mono("HpText", body, "0 / 0", 18, UITheme.Text, TextAlignmentOptions.Right, 4f);
+            var infoText = K.Text("Info", body, "", 19, UITheme.TextDim, TextAlignmentOptions.TopLeft);
+            var popup = K.Text("Popup", body, "0", 56, Color.white, TextAlignmentOptions.Center);
             popup.fontStyle = FontStyles.Bold;
             popup.outlineWidth = 0.25f;
             popup.outlineColor = new Color32(0, 0, 0, 255);
 
             if (enemy)
             {
-                SetRect(portrait.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0.5f, 0.5f), new Vector2(0, 30), new Vector2(-20, -140));
-                SetRect(nameText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 62), new Vector2(-24, 40));
-                SetRect(hpBar.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(-24, 16));
-                SetRect(hpText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 62), new Vector2(-24, 40));
-                SetRect(infoText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 6), new Vector2(-24, 30));
-                SetRect(popup.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 60), new Vector2(300, 90));
+                K.SetRect(portrait.rectTransform, K.BottomLeft, K.TopRight, K.Center, new Vector2(0, 30), new Vector2(-20, -140));
+                K.SetRect(nameText.rectTransform, K.BottomLeft, K.BottomRight, K.Bottom, new Vector2(0, 62), new Vector2(-24, 40));
+                K.SetRect(hpBar.rectTransform, K.BottomLeft, K.BottomRight, K.Bottom, new Vector2(0, 42), new Vector2(-24, 12));
+                K.SetRect(hpText.rectTransform, K.BottomLeft, K.BottomRight, K.Bottom, new Vector2(0, 62), new Vector2(-24, 40));
+                K.SetRect(infoText.rectTransform, K.BottomLeft, K.BottomRight, K.Bottom, new Vector2(0, 6), new Vector2(-24, 30));
+                K.SetRect(popup.rectTransform, K.Center, K.Center, K.Center, new Vector2(0, 60), new Vector2(300, 90));
             }
             else
             {
-                SetRect(portrait.rectTransform, new Vector2(0, 0), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(10, 0), new Vector2(150, -20));
-                SetRect(nameText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1), new Vector2(172, -14), new Vector2(-184, 40));
-                SetRect(hpBar.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1), new Vector2(172, -66), new Vector2(-190, 18));
-                SetRect(hpText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1), new Vector2(172, -88), new Vector2(-190, 34));
-                SetRect(infoText.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 1), new Vector2(172, -130), new Vector2(-190, -140));
-                SetRect(popup.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 40), new Vector2(300, 90));
+                K.SetRect(portrait.rectTransform, K.BottomLeft, K.TopLeft, K.Left, new Vector2(10, 0), new Vector2(150, -20));
+                K.SetRect(nameText.rectTransform, K.TopLeft, K.TopRight, K.TopLeft, new Vector2(172, -14), new Vector2(-184, 40));
+                K.SetRect(hpBar.rectTransform, K.TopLeft, K.TopRight, K.TopLeft, new Vector2(172, -66), new Vector2(-190, 12));
+                K.SetRect(hpText.rectTransform, K.TopLeft, K.TopRight, K.TopLeft, new Vector2(172, -84), new Vector2(-190, 34));
+                K.SetRect(infoText.rectTransform, K.BottomLeft, K.TopRight, K.TopLeft, new Vector2(172, -130), new Vector2(-190, -140));
+                K.SetRect(popup.rectTransform, K.Center, K.Center, K.Center, new Vector2(0, 40), new Vector2(300, 90));
             }
 
             var view = root.gameObject.AddComponent<BattleUnitView>();
-            SetField(view, "body", body);
-            SetField(view, "portrait", portrait);
-            SetField(view, "portraitLabel", portraitLabel);
-            SetField(view, "nameText", nameText);
-            SetField(view, "hpFill", hpFill.rectTransform);
-            SetField(view, "hpText", hpText);
-            SetField(view, "infoText", infoText);
-            SetField(view, "frame", frame);
-            SetField(view, "popupTemplate", popup);
+            K.SetField(view, "body", body);
+            K.SetField(view, "portrait", portrait);
+            K.SetField(view, "portraitLabel", portraitLabel);
+            K.SetField(view, "nameText", nameText);
+            K.SetField(view, "hpFill", hpFill.rectTransform);
+            K.SetField(view, "hpText", hpText);
+            K.SetField(view, "infoText", infoText);
+            K.SetField(view, "frame", frame);
+            K.SetField(view, "popupTemplate", popup);
             return view;
         }
 
@@ -700,160 +1051,121 @@ namespace ProjectVita.EditorTools
             CreateEventSystem();
 
             var canvas = CreateCanvas("TitleCanvas", 0);
-            Stretch(CreateImage("Background", canvas.transform, ColTitleBackground).rectTransform);
+            K.Stretch(K.Img("Background", canvas.transform, UITheme.Bg).rectTransform);
+            var ambient = K.Rect("Ambient", canvas.transform);
+            K.Stretch(ambient);
 
-            // 왼쪽에 기울어진 포인트 띠
-            var band = CreateImage("AccentBand", canvas.transform, ColAccent);
-            band.gameObject.AddComponent<UISkew>().Skew = 120f;
-            SetRect(band.rectTransform, new Vector2(0, 0), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(60, 0), new Vector2(26, 0));
+            var intro = K.Rect("Intro", canvas.transform);
+            K.Stretch(intro);
+            var introGroup = intro.gameObject.AddComponent<CanvasGroup>();
 
+            // 가운데: eyebrow, 로고, 부제, 선, 메뉴 (개발 빌드에서는 TitleMenu가 왼쪽으로 민다)
+            var center = K.Rect("Center", intro);
+            K.Place(center, K.Center, Vector2.zero, new Vector2(1320, 1080));
+            var eyebrow = K.Mono("Eyebrow", center, "STORY  ·  EXPLORATION  ·  TURN-BASED BATTLE", 15, UITheme.Amber, TextAlignmentOptions.Center, 50f);
+            K.Place(eyebrow.rectTransform, K.Center, new Vector2(0, 300), new Vector2(1200, 24));
             // 가제 미정. 세계관 문서명을 임시로 쓴다.
-            var logo = CreateText("Logo", canvas.transform, "PROJECT : VITA", 112, ColText, TextAlignmentOptions.Left);
-            logo.fontStyle = FontStyles.Bold;
-            SetRect(logo.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(170, 230), new Vector2(1100, 150));
-            var sub = CreateText("Subtitle", canvas.transform, "가제 · 데모 빌드", 30, ColSubText, TextAlignmentOptions.Left);
-            SetRect(sub.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(176, 140), new Vector2(1100, 50));
+            var logo = K.Display("Logo", center, "PROJECT : VITA", 62, UITheme.Hex("#E4E7F0"), TextAlignmentOptions.Center, 30f);
+            K.Place(logo.rectTransform, K.Center, new Vector2(0, 218), new Vector2(1200, 100));
+            var sub = K.Text("Subtitle", center, "가제 · 데모 빌드", 22, UITheme.TextDim, TextAlignmentOptions.Center, spacing: 60f);
+            K.Place(sub.rectTransform, K.Center, new Vector2(0, 140), new Vector2(900, 36));
+            var line = K.Sprite("Line", center, "ui_grad_hc", UITheme.Periwinkle);
+            K.Place(line.rectTransform, K.Center, new Vector2(0, 92), new Vector2(320, 2));
 
-            var menu = CreateRect("Menu", canvas.transform);
-            SetRect(menu, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 1), new Vector2(170, 60), new Vector2(440, 0));
+            var menu = K.Rect("Menu", center);
+            K.SetRect(menu, K.Center, K.Center, K.Top, new Vector2(0, 50), new Vector2(440, 0));
             var menuLayout = menu.gameObject.AddComponent<VerticalLayoutGroup>();
-            menuLayout.spacing = 16;
-            menuLayout.childControlWidth = true;
-            menuLayout.childControlHeight = true;
+            menuLayout.spacing = 6;
+            menuLayout.childControlWidth = menuLayout.childControlHeight = true;
             menuLayout.childForceExpandHeight = false;
             menu.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var startButton = CreateButton("StartButton", menu, "처음부터", 36, 84, skew: 22f);
-            var continueButton = CreateButton("ContinueButton", menu, "이어하기", 36, 84, skew: 22f);
-            var loadButton = CreateButton("LoadButton", menu, "불러오기", 36, 84, skew: 22f);
-            var settingsButton = CreateButton("SettingsButton", menu, "설정", 36, 84, skew: 22f);
-            var quitButton = CreateButton("QuitButton", menu, "종료", 36, 84, skew: 22f);
+            var startButton = TitleButton(menu, "처음부터");
+            var continueButton = TitleButton(menu, "이어하기");
+            var loadButton = TitleButton(menu, "불러오기");
+            var settingsButton = TitleButton(menu, "설정");
+            var quitButton = TitleButton(menu, "종료");
 
-            var hint = CreateText("ControlsHint", canvas.transform,
-                "클릭 / Space / Enter: 넘기기    숫자 키: 선택지    L, 휠 위로: 대사 기록    A: 오토    Tab: 스킵(읽은 대사)    Ctrl: 빨리감기    Esc: 메뉴\n" +
-                "<size=90%>개발용    F1: 개발 정보 숨기기    F5: 지금 노드 다시 시작</size>", 22, ColSubText, TextAlignmentOptions.BottomLeft);
-            SetRect(hint.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(170, 28), new Vector2(1180, 70));
+            var hint = K.Text("ControlsHint", center,
+                "클릭 / Space / Enter: 넘기기   숫자 키: 선택지   L, 휠 위로: 대사 기록   A: 오토   Tab: 스킵   Ctrl: 빨리감기   Esc: 메뉴\n" +
+                "<size=88%>개발용   F1: 개발 정보 숨기기   F5: 지금 노드 다시 시작</size>", 17, UITheme.TextDim.WithAlpha(0.7f), TextAlignmentOptions.Bottom, spacing: 2f);
+            K.Place(hint.rectTransform, K.Bottom, new Vector2(0, 26), new Vector2(1320, 60));
 
             // ---- 에피소드 선택 (개발용)
-            var panel = CreateImage("EpisodePanel", canvas.transform, new Color(1, 1, 1, 0.02f));
-            var panelRt = panel.rectTransform;
-            panelRt.anchorMin = new Vector2(1, 0);
-            panelRt.anchorMax = new Vector2(1, 1);
-            panelRt.pivot = new Vector2(1, 0.5f);
-            panelRt.offsetMin = new Vector2(-560, 40);
-            panelRt.offsetMax = new Vector2(-40, -40);
-
-            var header = CreateText("Header", panelRt, "에피소드 선택 (개발용)\n<size=70%><color=#9AA0A6>Episodes.csv의 행마다 버튼이 생긴다</color></size>", 30, ColText, TextAlignmentOptions.TopLeft);
-            SetRect(header.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), new Vector2(0, -24), new Vector2(-48, 90));
-
-            var list = CreateRect("List", panelRt);
-            list.anchorMin = new Vector2(0, 0);
-            list.anchorMax = new Vector2(1, 1);
-            list.offsetMin = new Vector2(24, 24);
-            list.offsetMax = new Vector2(-24, -130);
+            var panel = K.CutPanel("EpisodePanel", intro, 16, UITheme.Panel.WithAlpha(0.9f), UITheme.Line);
+            K.SetRect(panel.rectTransform, new Vector2(1, 0), new Vector2(1, 1), new Vector2(1, 0.5f), new Vector2(-30, 0), new Vector2(430, -60));
+            var header = K.Mono("Header", panel.transform, "EPISODE SELECT // DEV", 14, UITheme.Amber, TextAlignmentOptions.TopLeft, 26f);
+            K.SetRect(header.rectTransform, K.TopLeft, K.TopRight, K.Top, new Vector2(0, -30), new Vector2(-60, 22));
+            var headerSub = K.Text("Sub", panel.transform, "Episodes.csv의 행마다 버튼이 생긴다", 19, UITheme.TextDim, TextAlignmentOptions.TopLeft);
+            K.SetRect(headerSub.rectTransform, K.TopLeft, K.TopRight, K.Top, new Vector2(0, -58), new Vector2(-60, 28));
+            var list = K.Rect("List", panel.transform);
+            K.Stretch(list, 24, 24, 24, 110);
             var listLayout = list.gameObject.AddComponent<VerticalLayoutGroup>();
-            listLayout.spacing = 12;
+            listLayout.spacing = 10;
             listLayout.childAlignment = TextAnchor.UpperCenter;
-            listLayout.childControlWidth = true;
-            listLayout.childControlHeight = true;
+            listLayout.childControlWidth = listLayout.childControlHeight = true;
             listLayout.childForceExpandHeight = false;
-            var episodeTemplate = CreateButton("EpisodeButtonTemplate", list, "에피소드", 30, 96);
+            var episodeTemplate = K.Button("EpisodeButtonTemplate", list, "에피소드", 25, 84);
 
-            // ---- 설정
+            // ---- 분위기 효과 (맨 위)
+            var fxLayer = K.Rect("ScreenFx", canvas.transform);
+            K.Stretch(fxLayer);
+            K.CreateScreenFx(ambient, fxLayer);
+
+            // ---- 설정, 불러오기, 확인창, 알림
             var overlayCanvas = CreateCanvas("OverlayCanvas", 50);
-            var slots = CreateSaveSlotPanel(overlayCanvas);
+            var confirm = CreateConfirmDialog(overlayCanvas);
+            var slots = CreateSaveSlotPanel(overlayCanvas, confirm);
             var settings = CreateSettingsPanel(overlayCanvas);
+            CreateToast(overlayCanvas);
 
             var menuComp = canvas.gameObject.AddComponent<TitleMenu>();
-            SetField(menuComp, "episodesCsv", episodesCsv);
-            SetField(menuComp, "startButton", startButton);
-            SetField(menuComp, "continueButton", continueButton);
-            SetField(menuComp, "loadButton", loadButton);
-            SetField(menuComp, "settingsButton", settingsButton);
-            SetField(menuComp, "quitButton", quitButton);
-            SetField(menuComp, "settings", settings);
-            SetField(menuComp, "slots", slots);
-            SetField(menuComp, "episodePanel", panel.gameObject);
-            SetField(menuComp, "episodeListRoot", list);
-            SetField(menuComp, "episodeButtonTemplate", episodeTemplate);
+            K.SetField(menuComp, "episodesCsv", episodesCsv);
+            K.SetField(menuComp, "intro", introGroup);
+            K.SetField(menuComp, "centerGroup", center);
+            K.SetField(menuComp, "menuRoot", menu);
+            K.SetField(menuComp, "startButton", startButton);
+            K.SetField(menuComp, "continueButton", continueButton);
+            K.SetField(menuComp, "loadButton", loadButton);
+            K.SetField(menuComp, "settingsButton", settingsButton);
+            K.SetField(menuComp, "quitButton", quitButton);
+            K.SetField(menuComp, "settings", settings);
+            K.SetField(menuComp, "slots", slots);
+            K.SetField(menuComp, "confirm", confirm);
+            K.SetField(menuComp, "episodePanel", panel.gameObject);
+            K.SetField(menuComp, "episodeListRoot", list);
+            K.SetField(menuComp, "episodeButtonTemplate", episodeTemplate);
 
             EditorSceneManager.SaveScene(scene, TitleScenePath);
             Debug.Log("[Setup] Title 씬 생성: " + TitleScenePath);
         }
 
-        // ================================================================ 설정 화면 (타이틀과 일시정지 공용)
-
-        /// <summary>SettingsPanel 컴포넌트는 항상 켜진 캔버스에 붙이고, 화면(root)만 켜고 끈다.</summary>
-        static SettingsPanel CreateSettingsPanel(Canvas canvas)
+        /// <summary>타이틀 메뉴 글자 버튼: 마우스를 올리면 밝아지고 자간이 넓어지며 왼쪽에 시안 ▸가 나타난다.</summary>
+        static Button TitleButton(Transform menu, string label)
         {
-            var root = CreateImage("SettingsPanel", canvas.transform, new Color(0, 0, 0, 0.8f), raycast: true);
-            Stretch(root.rectTransform);
-
-            var window = CreateImage("Window", root.transform, ColPanel, raycast: true);
-            SetRect(window.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(980, 720));
-            var accent = CreateImage("AccentLine", window.transform, ColAccent);
-            SetRect(accent.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(0, 6));
-
-            var title = CreateText("Title", window.transform, "설정", 48, ColText, TextAlignmentOptions.Left);
-            title.fontStyle = FontStyles.Bold;
-            SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(60, -40), new Vector2(600, 70));
-
-            var (bgmSlider, bgmValue) = CreateSliderRow(window.transform, "BGM 음량", -150);
-            var (sfxSlider, sfxValue) = CreateSliderRow(window.transform, "효과음 음량", -235);
-            var (speedSlider, speedValue) = CreateSliderRow(window.transform, "텍스트 속도", -320);
-            var (autoSlider, autoValue) = CreateSliderRow(window.transform, "오토 속도", -405);
-
-            var windowMode = CreateButton("WindowModeButton", window.transform, "화면: 창 모드", 30, 0);
-            SetRect((RectTransform)windowMode.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(60, -505), new Vector2(420, 70));
-            var close = CreateButton("CloseButton", window.transform, "닫기", 30, 0, skew: 16f);
-            SetRect((RectTransform)close.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-60, 50), new Vector2(220, 70));
-
-            var panel = canvas.gameObject.AddComponent<SettingsPanel>();
-            SetField(panel, "root", root.gameObject);
-            SetField(panel, "bgmSlider", bgmSlider);
-            SetField(panel, "bgmValue", bgmValue);
-            SetField(panel, "sfxSlider", sfxSlider);
-            SetField(panel, "sfxValue", sfxValue);
-            SetField(panel, "textSpeedSlider", speedSlider);
-            SetField(panel, "textSpeedValue", speedValue);
-            SetField(panel, "autoSpeedSlider", autoSlider);
-            SetField(panel, "autoSpeedValue", autoValue);
-            SetField(panel, "windowModeButton", windowMode);
-            SetField(panel, "windowModeLabel", windowMode.GetComponentInChildren<TMP_Text>());
-            SetField(panel, "closeButton", close);
-            return panel;
-        }
-
-        static (Slider, TMP_Text) CreateSliderRow(Transform parent, string label, float y)
-        {
-            var labelText = CreateText(label + "Label", parent, label, 30, ColText, TextAlignmentOptions.Left);
-            SetRect(labelText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(60, y), new Vector2(260, 60));
-
-            var sliderGo = DefaultControls.CreateSlider(new DefaultControls.Resources());
-            sliderGo.name = label + "Slider";
-            SetLayerRecursive(sliderGo, LayerMask.NameToLayer("UI"));
-            sliderGo.transform.SetParent(parent, false);
-            var slider = sliderGo.GetComponent<Slider>();
-            SetRect((RectTransform)sliderGo.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(340, y), new Vector2(440, 28));
-            foreach (var img in sliderGo.GetComponentsInChildren<Image>(true))
-            {
-                img.color = img.name switch
-                {
-                    "Background" => Hex("#2B2F38"),
-                    "Fill" => ColAccent,
-                    _ => ColText, // Handle
-                };
-            }
-
-            var value = CreateText(label + "Value", parent, "0", 30, ColText, TextAlignmentOptions.Right);
-            SetRect(value.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 0.5f), new Vector2(800, y), new Vector2(120, 60));
-            return (slider, value);
+            var root = K.Img("Title_" + label, menu, new Color(0, 0, 0, 0), raycast: true);
+            root.gameObject.AddComponent<LayoutElement>().preferredHeight = 62;
+            var button = root.gameObject.AddComponent<Button>();
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic = root;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            var text = K.Text("Label", root.transform, label, 29, UITheme.TextDim, TextAlignmentOptions.Center, spacing: 30f);
+            K.Stretch(text.rectTransform);
+            var marker = K.Sprite("Marker", root.transform, "ui_tri", UITheme.Cyan);
+            K.Place(marker.rectTransform, K.Left, new Vector2(46, 0), new Vector2(10, 12));
+            var hover = root.gameObject.AddComponent<UIHoverFx>();
+            K.SetArray(hover, "reveal", new Object[] { marker });
+            K.SetArray(hover, "tint", new Object[] { text });
+            K.SetValue(hover, "hoverColor", sp => sp.colorValue = UITheme.TextBright);
+            K.SetField(hover, "spacing", text);
+            K.SetValue(hover, "spacingAdd", sp => sp.floatValue = 8f);
+            return button;
         }
 
         // ================================================================ Build Settings
 
         static void ApplyBuildScenes()
         {
-            // Title, Story를 맨 앞에 두고, 그 밖에 이미 등록된 씬(에피소드 전용 씬 등)은 뒤에 유지한다.
+            // 네 씬을 맨 앞에 두고, 그 밖에 이미 등록된 씬(에피소드 전용 씬 등)은 뒤에 유지한다.
             var first = new[] { TitleScenePath, StoryScenePath, ExplorationScenePath, BattleScenePath };
             var scenes = first.Select(p => new EditorBuildSettingsScene(p, true)).ToList();
             scenes.AddRange(EditorBuildSettings.scenes.Where(s => !first.Contains(s.path)));
@@ -974,117 +1286,10 @@ namespace ProjectVita.EditorTools
             return canvas;
         }
 
-        static RectTransform CreateRect(string name, Transform parent)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.layer = LayerMask.NameToLayer("UI");
-            var rt = (RectTransform)go.transform;
-            rt.SetParent(parent, false);
-            return rt;
-        }
-
-        static RectTransform CreateVerticalList(string name, Transform parent, Vector2 center, float width)
-        {
-            var list = CreateRect(name, parent);
-            SetRect(list, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), center, new Vector2(width, 0));
-            var layout = list.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 16;
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandHeight = false;
-            list.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            return list;
-        }
-
-        /// <summary>단색 이미지. 클릭을 막지 않도록 raycastTarget은 기본으로 끈다 (대사 넘기기 클릭 판정 때문).</summary>
-        static Image CreateImage(string name, Transform parent, Color color, bool raycast = false)
-        {
-            var img = CreateRect(name, parent).gameObject.AddComponent<Image>();
-            img.color = color;
-            img.raycastTarget = raycast;
-            return img;
-        }
-
-        static TextMeshProUGUI CreateText(string name, Transform parent, string text, float size, Color color, TextAlignmentOptions align)
-        {
-            var tmp = CreateRect(name, parent).gameObject.AddComponent<TextMeshProUGUI>();
-            if (TMP_Settings.defaultFontAsset != null) tmp.font = TMP_Settings.defaultFontAsset;
-            tmp.text = text;
-            tmp.fontSize = size;
-            tmp.color = color;
-            tmp.alignment = align;
-            tmp.textWrappingMode = TextWrappingModes.Normal;
-            tmp.raycastTarget = false;
-            return tmp;
-        }
-
-        /// <summary>height가 0보다 크면 레이아웃 그룹 안에서 쓸 높이(LayoutElement)를 준다. skew를 주면 평행사변형이 된다.</summary>
-        static Button CreateButton(string name, Transform parent, string label, float fontSize, float height, float skew = 0f)
-        {
-            // 버튼 색 변화는 이미지 색에 곱해진다. 이미지는 흰색으로 두고 상태별 색을 그대로 지정한다.
-            var img = CreateImage(name, parent, Color.white, raycast: true);
-            if (skew != 0f) img.gameObject.AddComponent<UISkew>().Skew = skew;
-            var button = img.gameObject.AddComponent<Button>();
-            var colors = button.colors;
-            colors.normalColor = ColButton;
-            colors.highlightedColor = Hex("#5A1E1B");
-            colors.pressedColor = ColAccent;
-            colors.selectedColor = ColButton; // 클릭 뒤에 강조가 남지 않게
-            colors.disabledColor = new Color(0.13f, 0.14f, 0.16f, 0.5f);
-            colors.colorMultiplier = 1f;
-            colors.fadeDuration = 0.08f;
-            button.colors = colors;
-            if (height > 0f) img.gameObject.AddComponent<LayoutElement>().preferredHeight = height;
-
-            var text = CreateText("Label", img.transform, label, fontSize, ColText, TextAlignmentOptions.Center);
-            text.fontStyle = FontStyles.Bold;
-            Stretch(text.rectTransform, 24, 6);
-            return button;
-        }
-
-        static void Stretch(RectTransform rt, float padX = 0, float padY = 0)
-        {
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.offsetMin = new Vector2(padX, padY);
-            rt.offsetMax = new Vector2(-padX, -padY);
-        }
-
-        static void SetRect(RectTransform rt, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 pos, Vector2 size)
-        {
-            rt.anchorMin = anchorMin;
-            rt.anchorMax = anchorMax;
-            rt.pivot = pivot;
-            rt.anchoredPosition = pos;
-            rt.sizeDelta = size;
-        }
-
         static void SetLayerRecursive(GameObject go, int layer)
         {
             go.layer = layer;
             foreach (Transform child in go.transform) SetLayerRecursive(child.gameObject, layer);
-        }
-
-        /// <summary>private [SerializeField]에 값을 넣는다. 필드 이름이 틀리면 바로 알 수 있게 에러를 낸다.</summary>
-        static void SetField(Object target, string field, Object value)
-        {
-            var so = new SerializedObject(target);
-            var prop = so.FindProperty(field);
-            if (prop == null)
-            {
-                Debug.LogError($"[Setup] {target.GetType().Name}에 '{field}' 필드가 없다.");
-                return;
-            }
-            prop.objectReferenceValue = value;
-            so.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        static Color Hex(string hex)
-        {
-            ColorUtility.TryParseHtmlString(hex, out var c);
-            return c;
         }
     }
 }

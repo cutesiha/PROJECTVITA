@@ -127,12 +127,13 @@ namespace ProjectVita.Exploration
                 item.gameObject.SetActive(true);
                 item.name = "Map_" + loc.id;
                 bool visited = IsTrue(ExplorationData.VisitedVariable(loc.id));
-                item.GetComponentInChildren<TMP_Text>(true).text = visited ? loc.displayName : $"{loc.displayName}  <size=70%><color=#B3261E>NEW</color></size>";
+                item.GetComponentInChildren<TMP_Text>(true).text = visited ? loc.displayName : $"{loc.displayName}  <size=62%><color=#4DB8FF>NEW</color></size>";
                 string id = loc.id;
                 item.onClick.AddListener(() => Tween.Forget(EnterLocation(id)));
                 mapItems.Add(item);
             }
             mapView.SetActive(true);
+            ProjectVita.UI.UIPanelAnim.Stagger(mapListRoot, destroyCancellationToken, 0.05f, 0.06f, 0.3f); // 장소가 차례로 나타난다
             DevOverlay.SetNode("(지도)");
             Save(); // 지도에서도 저장할 수 있게 (불러오면 지도부터)
         }

@@ -1,5 +1,5 @@
-﻿character_id,yarn_name,name_color
-캐릭터 id. 영어 숫자 _ 만 쓴다. Art/Characters/{id}/ 폴더 이름과 같다,대사에서 쓰는 화자 이름 (주인공: 대사 의 주인공),이름표 색
-영어 숫자 _,자유 (대사의 화자 이름과 똑같이),#RRGGBB
-Protagonist,주인공,#B3261E
-Stranger,???,#4B5394
+﻿character_id,yarn_name,name_color,name_tag
+캐릭터 id. 영어 숫자 _ 만 쓴다. Art/Characters/{id}/ 폴더 이름과 같다,대사에서 쓰는 화자 이름 (주인공: 대사 의 주인공),이름표 색,이름표 앞의 짧은 식별 칩 (예: SR-04). 비우면 칩 없이 이름만 나온다
+영어 숫자 _,자유 (대사의 화자 이름과 똑같이),#RRGGBB,영어 숫자 - (짧게)
+Protagonist,주인공,#B3261E,
+Stranger,???,#4B5394,

@@ -26,9 +26,10 @@ namespace ProjectVita.Battle
         [SerializeField] TMP_Text popupTemplate;
 
         static readonly Color FrameIdle = new Color(1f, 1f, 1f, 0f);
-        static readonly Color FrameActing = new Color(0.95f, 0.85f, 0.3f, 0.9f);
-        static readonly Color FrameSelectable = new Color(0.70f, 0.15f, 0.12f, 0.6f);
-        static readonly Color FrameHover = new Color(1f, 0.3f, 0.25f, 1f);
+        // UI 시안 색: 행동 중 = 앰버, 고를 수 있음 = 시안, 마우스 올림 = 밝은 시안
+        static readonly Color FrameActing = new Color(0.91f, 0.53f, 0.23f, 0.95f);
+        static readonly Color FrameSelectable = new Color(0.30f, 0.72f, 1f, 0.5f);
+        static readonly Color FrameHover = new Color(0.55f, 0.85f, 1f, 1f);
 
         public Unit Unit { get; private set; }
 
@@ -125,6 +126,7 @@ namespace ProjectVita.Battle
 
         public void Shake(float strength, float time)
         {
+            if (!GameSettings.ScreenShake) return; // 설정에서 화면 흔들림을 껐다
             var token = Tween.Restart(ref shakeCts, destroyCancellationToken);
             Tween.Forget(Tween.Run(time, t =>
             {

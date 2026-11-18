@@ -385,6 +385,7 @@ namespace ProjectVita.Story
         /// <summary>&lt;&lt;shake [세기] [시간]&gt;&gt;. 세기 1 = 약 30px. 무대만 흔들고 대사창은 그대로 둔다. 기다리지 않는다.</summary>
         public void Shake(float strength, float time)
         {
+            if (!GameSettings.ScreenShake) return; // 설정에서 화면 흔들림을 껐다
             var token = Tween.Restart(ref shakeCts, Life);
             float amp = 30f * Mathf.Max(0f, strength);
             Tween.Forget(Tween.Run(time, t =>

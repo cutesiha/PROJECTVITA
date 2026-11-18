@@ -16,8 +16,8 @@ namespace ProjectVita.Exploration
         [SerializeField] TMP_Text label;
 
         // UI가 선형 색공간에서 섞여서 낮은 알파도 진하게 보인다. 값을 작게 둔다.
-        static readonly Color HoverColor = new Color(0.70f, 0.15f, 0.12f, 0.16f);
-        static readonly Color DevColor = new Color(0.4f, 1f, 0.4f, 0.035f);
+        static readonly Color HoverColor = new Color(0.30f, 0.72f, 1f, 0.12f); // 시안 (UI 시안 색)
+        static readonly Color DevColor = new Color(0.48f, 0.51f, 0.65f, 0.05f); // 페리윙클
 
         public ExplorationData.ObjectDef Def { get; private set; }
         Action<ExplorationHotspot> onClick;

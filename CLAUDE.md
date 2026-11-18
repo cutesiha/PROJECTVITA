@@ -30,6 +30,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 씬 생성 (Yarn Project, 리소스 목록, CSV 임포트, 씬 4개, 빌드 씬) | `Tools > Project Vita > 씬 생성 (Title, Story, Exploration, Battle)`. 씬을 처음부터 다시 만든다. 씬은 손으로 고치지 말고 `Scripts/Editor/DialogueSetup.cs`를 고친다 |
 | 리소스 목록 갱신 | 자동 (Art, Audio 폴더나 `Characters.csv`가 바뀌면 `Resources/AssetCatalog.asset`이 저절로 갱신됨). 수동: `Tools > Project Vita > 리소스 목록 갱신` |
 | 임시 그림과 소리 만들기 | `Tools > Project Vita > 임시 그림과 소리 만들기`. 목록은 `Scripts/Editor/PlaceholderArt.cs`. **이미 있는 파일은 건너뛴다** (최종 아트를 덮어쓰지 않음) |
+| 임시 UI 그림 만들기 | `Tools > Project Vita > 임시 UI 그림 만들기` (씬 생성이 먼저 부른다). `Art/UI/*.png`(깎인 패널 9-slice, 아이콘, 육각형, 스캔라인 등, 흰색)와 UI 폰트 에셋. 이미 있는 파일은 건너뛴다. 두부님 UI 아트는 같은 파일 이름으로 덮어쓴다 |
 | 에피소드 표 검사 | `Tools > Project Vita > 에피소드 표 검사` (start_node 노드 존재, next_episode, 씬 등록 확인) |
 | 대사 플레이 | `Title` 씬에서 Play → `처음부터` (표의 첫 에피소드) 또는 오른쪽 `에피소드 선택 (개발용)`. `Story` 씬을 바로 Play하면 `StoryDirector.fallbackEpisodeId` (비면 첫 에피소드) |
 | 에피소드 목록 | `Assets/_Project/Data/Episodes.csv`: `episode_id, display_name, unity_scene, start_node, next_episode`. 행을 추가하면 타이틀의 에피소드 버튼도 늘어난다 |
@@ -47,6 +48,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Branches
 
 - `main`: 사용자가 관리한다. 코드, 씬, 반영이 끝난 대사가 있다.
+- `ui`: UI 작업 브랜치 (2026-11-18, `main`의 4-7 커밋 위에서 시작). 사용자가 확인하고 `main`에 머지한다.
 - `dialogue`: 팀원이 `Assets/_Project/Dialogue/**/*.yarn`만 커밋한다. 사용자가 `main`으로 머지하고, 작가의 `// 연출 메모`를 명령으로 바꾼다.
 - `.meta`는 사용자만 커밋한다. 작가가 만든 새 `.yarn`의 `.meta`는 사용자가 Unity에서 열 때 생성된다.
 - **Claude는 커밋하지 않는다.** 사용자가 GitHub Desktop으로 직접 커밋한다. 푸시, 머지, 브랜치 생성은 사용자가 요청할 때만 한다.
@@ -106,6 +108,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `SaveSystem`: 자동 저장(슬롯 0. 노드에 들어갈 때마다, 탐색은 장소에 들어갈 때, 지도, 조사 후)과 수동 슬롯 1~7(썸네일 PNG). 에피소드, 노드(또는 장소), 변수, 무대, BGM을 저장한다. 수동 저장은 마지막 자동 저장 시점(`LastSnapshot`)을 복사하므로, **불러오면 그 노드(장소)의 처음부터** 시작한다. 전투 중에는 저장할 수 없다.
   - `EpisodeFlow.Resume(save)`: 이어하기, 슬롯 불러오기, 핫리로드가 모두 이 함수로 들어온다 (변수, 대사 기록, 스킵 초기화 후 씬 로드).
   - `DevOverlay`: 에피소드, 노드, 최근 명령을 왼쪽 위에 표시한다. F1로 숨기고, 메뉴가 열려 있으면 저절로 숨는다(썸네일에도 안 찍힘). F5는 지금 노드 다시 시작. Development Build가 아니면 꺼진다.
+- **UI** (`ui` 브랜치, 2026-11-18. 다른 AI가 만든 HTML 시안 `dystopia-vn-ui.html`을 옮긴 임시 UI. 디스토피아 톤: 짙은 검정, 페리윙클 테두리, 시안 강조, 앰버 경고, 모노 라벨, CRT 스캔라인)
+  - 색은 `Runtime/UI/UITheme`, 부품은 `Editor/UIKit`(깎인 패널, 버튼, 아이콘 버튼, 창, 슬라이더, 스위치, 화면 효과), 배치는 `Editor/DialogueSetup`. 그림은 `Art/UI`(`Editor/UIArtGenerator`가 만든다).
+  - 폰트: 한글 본문 Pretendard, 영문 라벨 IBM Plex Mono(`UIKit.Mono`), 제목 Michroma(`UIKit.Display`). 둘 다 OFL이고 한글은 Pretendard로 대체(fallback)된다. 창 제목 "SETTINGS 설정"은 `ConfirmDialog.WindowTitle`.
+  - 실행 중 부품(`Runtime/UI/`): `UIPanelAnim`(창 열기/닫기: 바탕 페이드 + 창이 올라오며 커짐 + 자식 차례로 페이드), `UIHoverFx`(마우스 올림: 나타나기, 밀리기, 색, 테두리, 자간), `UIToggleSwitch`, `ConfirmDialog`(예/아니오, 씬마다 하나), `UIToast`(아래 알림), `ScreenFx`(스캔라인, 노이즈, 비네트, 육각형, 먼지), `HudPanel`(왼쪽 위 REC + 에피소드). 메뉴는 일시정지 중에 열리므로 애니메이션은 모두 실제 시간(`UIAnim.Run`).
+  - 대사창: 아래에서 올라오고 끝나면 내려간다. 이름표 = [식별 칩] + 육각 점 + 이름 (칩은 `Characters.csv`의 `name_tag`가 있을 때만), 왼쪽 막대는 화자 색, LOG 번호, 타이핑 커서, CLICK ▸. 오른쪽 위 AUTO/SKIP/LOG(대사 중에만)/MENU.
+  - 설정: 텍스트 속도, 오토 속도, 읽은 대사만 스킵, 스캔라인, 노이즈, 화면 흔들림(끄면 `<<shake>>`와 전투 흔들림 없음), 전체 화면, BGM, 효과음.
+  - 시안의 HUD 중 신호/배터리 수치는 세계관 설정이 필요해서 뺐다 (비디님 확인 후). 창 위의 영문 문구(SIGNAL INTERRUPTED 등)는 시안 그대로의 임시 문구다.
 - **편의 기능** (4-7, `Scripts/Runtime/Story/`, `Menus/`)
   - `DialogueModes`: 오토(A, 설정의 오토 속도), 스킵(Tab, **읽은 대사만**. 처음 보는 대사, 선택지, 대화 끝, 씬 전환에서 멈춤), 빨리감기(Ctrl 누르는 동안, 안 읽은 대사도. 선택지에서 멈춤). 스킵 중에는 `GamePause.SetSpeed(6)`으로 트윈과 `<<wait>>`도 빨라진다. 오토는 씬이 바뀌어도 유지, 타이틀에서 꺼짐.
   - `ReadLines`: 읽은 줄 = Yarn 줄 id + 본문 해시. 작가가 대사를 고치면 그 줄은 다시 "안 읽음"이 된다. 게임 전체에 하나 (`read_lines.json`).
@@ -143,7 +152,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **OneDrive 밖, 영문 경로**에 프로젝트를 둔다. OneDrive 동기화는 Library 잠금과 지연을, 한글 경로는 빌드 도구 문제를 일으킨다.
 - TMP Settings에서 **"Use Modern Hangul Line Breaking Rules"를 켠다.** TMP Essential Resources를 다시 임포트하면 꺼지니 `1단계 기본 세팅 적용` 메뉴를 다시 실행한다.
-- 한글 폰트는 Pretendard (OFL, `Assets/_Project/Art/Fonts/Pretendard/`)다. TMP 기본 폰트는 `Pretendard-Regular SDF` (Dynamic, 2048 멀티 아틀라스)이고, `<b>`는 `Pretendard-Bold SDF`를 쓴다.
+- 한글 폰트는 Pretendard (OFL, `Assets/_Project/Art/Fonts/Pretendard/`)다. TMP 기본 폰트는 `Pretendard-Regular SDF` (Dynamic, 2048 멀티 아틀라스)이고, `<b>`는 `Pretendard-Bold SDF`를 쓴다. UI 영문 폰트 IBM Plex Mono, Michroma(OFL, `Art/Fonts/`)도 Dynamic이라 커밋 전에 같이 비워진다.
+- TMP `<font="이름">` 태그는 폰트 에셋이 Resources 안에 있어야 동작한다. 한 줄에 영문 폰트와 한글을 섞을 때는 영문 폰트 에셋의 fallback(Pretendard)에 맡긴다.
 - Git LFS는 쓰지 않는다. `.gitattributes`에서 이미지, 오디오, 폰트는 `binary`다.
 - Dynamic TMP 폰트 에셋은 플레이하는 동안 커진다. 커밋 전에 비우거나, Static 아틀라스(KS X 1001 2350자)로 굽는다.
 - 에디터 도구의 네임스페이스는 `.EditorTools`로 한다. `.Editor`로 끝나면 `: Editor`가 `UnityEditor.Editor` 대신 그 네임스페이스로 해석된다.
@@ -153,7 +163,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **새 .yarn 파일은 Yarn Project에 저절로 안 들어간다** (Yarn Spinner 3.3.2. 기존 파일 수정은 반영됨). `Editor/YarnProjectAutoRefresh.cs`가 Dialogue 폴더의 .yarn 추가/삭제/이동 때 프로젝트를 다시 임포트한다.
 - ScriptableObject 클래스는 **클래스 이름과 같은 파일**에 둔다. 다른 파일에 있으면 에셋이 스크립트를 잃는다 (`m_Script: {fileID: 0}`).
 - `EditorApplication.delayCall`은 에디터에 포커스가 없으면 돌지 않을 때가 있다. 리소스 목록과 CSV 자동 갱신은 Unity로 돌아오면 돈다. 꼭 바로 해야 하는 것은 후처리기 안에서 직접 한다.
-- UI는 선형 색공간에서 섞여서 낮은 알파도 진하게 보인다. 반투명 강조색은 알파를 작게 잡는다. 자식 Image는 항상 부모 위에 그려지니, 카드 테두리는 `Outline` 효과로 만든다.
+- UI는 선형 색공간에서 섞인다. **밝은 반투명(선, 강조, 노이즈)은 브라우저보다 훨씬 진하게, 어두운 반투명 판은 훨씬 비쳐 보인다.** HTML/CSS 값을 옮길 때 판은 알파 0.98 이상, 선과 강조는 절반쯤으로, 노이즈는 흰색 대신 검은색으로 쓴다 (`UITheme` 참고). 자식 Image는 항상 부모 위에 그려지니, 카드 테두리는 `Outline` 효과나 테두리 그림으로 만든다.
+- uGUI `Slider`는 Fill과 Handle을 부모(FillArea, HandleArea) 높이에 맞춰 늘린다. 얇은 막대는 부모 높이를 막대 두께로, 손잡이는 부모 높이를 0으로 둔다 (`UIKit.Slider`).
+- 레이아웃 그룹 안의 자식은 위치를 애니메이션하면 레이아웃과 싸운다. 차례로 나타나기는 CanvasGroup 알파만 바꾸고, 움직임은 레이아웃 밖의 자식(Content 등)에 준다. 카드를 흐리게 하는 알파도 등장 애니메이션과 겹치지 않게 안쪽 CanvasGroup에 둔다.
 - **Yarn 명령의 float 기본값**: Yarn Spinner 3.3.2 소스 제너레이터가 `float time = 0.6f`를 `0.6`(double)로 옮겨 써서 컴파일 에러가 난다. 소수 기본값은 `-1`(`StoryCommands.Auto`)로 두고 메서드 안에서 바꾼다. 정수 기본값은 괜찮다.
 - 생성된 Yarn 코드를 보려면 복사본 csproj를 `dotnet build -p:EmitCompilerGeneratedFiles=true -p:CompilerGeneratedFilesOutputPath=gen`으로 빌드한다.
 - **MCP for Unity**는 프로젝트 `.mcp.json` (`http://127.0.0.1:8080/mcp`)으로 연결한다. 서버는 Unity의 `Window > MCP for Unity`에서 시작한다 (에디터 시작 시 자동 실행 옵션이 꺼져 있으면 Unity를 재시작할 때마다 다시 눌러야 한다). VS Code 확장은 프로젝트 경로를 `c:/...`(소문자)로, Configure 버튼은 `~/.claude.json`에 `C:/...`(대문자)로 저장해서 서로 안 맞는다.

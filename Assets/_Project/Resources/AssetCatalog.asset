@@ -38,6 +38,7 @@ MonoBehaviour:
   - id: Protagonist
     yarnName: "\uC8FC\uC778\uACF5"
     nameColor: {r: 0.7019608, g: 0.14901961, b: 0.11764706, a: 1}
+    nameTag: 
     expressions:
     - name: default
       sprite: {fileID: 21300000, guid: 5eac6e63df1a0e943b586beed77983f3, type: 3}
@@ -48,6 +49,7 @@ MonoBehaviour:
   - id: Stranger
     yarnName: ???
     nameColor: {r: 0.29411766, g: 0.3254902, b: 0.5803922, a: 1}
+    nameTag: 
     expressions:
     - name: default
       sprite: {fileID: 21300000, guid: 1d30cf0a10598f049b790236cc2c9ce2, type: 3}

@@ -13,6 +13,10 @@ namespace ProjectVita.Core
         const string KeyTextSpeed = "vita.textSpeed";
         const string KeyFullscreen = "vita.fullscreen";
         const string KeyAutoSpeed = "vita.autoSpeed";
+        const string KeySkipReadOnly = "vita.skipReadOnly";
+        const string KeyScanlines = "vita.scanlines";
+        const string KeyFilmGrain = "vita.filmGrain";
+        const string KeyScreenShake = "vita.screenShake";
 
         public const int MinTextSpeed = 1;
         public const int MaxTextSpeed = 10;
@@ -26,6 +30,14 @@ namespace ProjectVita.Core
         /// <summary>1~10. 오토 모드에서 다음 줄로 넘어가기까지 기다리는 시간. 클수록 빠르다.</summary>
         public static int AutoSpeed { get; private set; } = 5;
         public static bool Fullscreen { get; private set; }
+        /// <summary>스킵(Tab)이 읽은 대사에서만 넘기는지. 끄면 처음 보는 대사도 넘긴다.</summary>
+        public static bool SkipReadOnly { get; private set; } = true;
+        /// <summary>CRT 스캔라인 효과</summary>
+        public static bool Scanlines { get; private set; } = true;
+        /// <summary>필름 노이즈 효과</summary>
+        public static bool FilmGrain { get; private set; } = true;
+        /// <summary>화면 흔들림 (&lt;&lt;shake&gt;&gt;, 전투 피격). 끄면 흔들지 않는다 (멀미 방지).</summary>
+        public static bool ScreenShake { get; private set; } = true;
 
         /// <summary>초당 글자 수. 최고 속도면 무한대(즉시 표시).</summary>
         public static float CharsPerSecond => TextSpeed >= MaxTextSpeed ? float.PositiveInfinity : 10f + TextSpeed * 8f;
@@ -47,6 +59,10 @@ namespace ProjectVita.Core
             SfxVolume = PlayerPrefs.GetFloat(KeySfx, 0.8f);
             TextSpeed = Mathf.Clamp(PlayerPrefs.GetInt(KeyTextSpeed, 5), MinTextSpeed, MaxTextSpeed);
             AutoSpeed = Mathf.Clamp(PlayerPrefs.GetInt(KeyAutoSpeed, 5), MinAutoSpeed, MaxAutoSpeed);
+            SkipReadOnly = PlayerPrefs.GetInt(KeySkipReadOnly, 1) == 1;
+            Scanlines = PlayerPrefs.GetInt(KeyScanlines, 1) == 1;
+            FilmGrain = PlayerPrefs.GetInt(KeyFilmGrain, 1) == 1;
+            ScreenShake = PlayerPrefs.GetInt(KeyScreenShake, 1) == 1;
             Fullscreen = PlayerPrefs.GetInt(KeyFullscreen, 0) == 1;
             ApplyWindowMode();
         }
@@ -76,6 +92,18 @@ namespace ProjectVita.Core
         {
             AutoSpeed = Mathf.Clamp(v, MinAutoSpeed, MaxAutoSpeed);
             PlayerPrefs.SetInt(KeyAutoSpeed, AutoSpeed);
+            Changed?.Invoke();
+        }
+
+        public static void SetSkipReadOnly(bool on) => SetFlag(KeySkipReadOnly, on, v => SkipReadOnly = v);
+        public static void SetScanlines(bool on) => SetFlag(KeyScanlines, on, v => Scanlines = v);
+        public static void SetFilmGrain(bool on) => SetFlag(KeyFilmGrain, on, v => FilmGrain = v);
+        public static void SetScreenShake(bool on) => SetFlag(KeyScreenShake, on, v => ScreenShake = v);
+
+        static void SetFlag(string key, bool on, Action<bool> assign)
+        {
+            assign(on);
+            PlayerPrefs.SetInt(key, on ? 1 : 0);
             Changed?.Invoke();
         }
 

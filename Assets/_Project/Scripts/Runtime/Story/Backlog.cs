@@ -18,6 +18,8 @@ namespace ProjectVita.Story
             public string speaker;
             public string text;
             public Color nameColor;
+            /// <summary>화자의 식별 칩 (Characters.csv name_tag). 없으면 빈 문자열</summary>
+            public string tag;
             /// <summary>고른 선택지</summary>
             public bool choice;
         }
@@ -25,16 +27,30 @@ namespace ProjectVita.Story
         static readonly List<Entry> entries = new List<Entry>();
         public static IReadOnlyList<Entry> Entries => entries;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetStatics() => entries.Clear();
+        /// <summary>새 게임(불러오기) 뒤로 나온 대사 수. 대사창의 LOG.001 번호다.</summary>
+        public static int LineCount { get; private set; }
 
-        public static void AddLine(string speaker, string text, Color nameColor) =>
-            Add(new Entry { speaker = speaker ?? string.Empty, text = text ?? string.Empty, nameColor = nameColor });
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            entries.Clear();
+            LineCount = 0;
+        }
+
+        public static void AddLine(string speaker, string text, Color nameColor, string tag = "")
+        {
+            LineCount++;
+            Add(new Entry { speaker = speaker ?? string.Empty, text = text ?? string.Empty, nameColor = nameColor, tag = tag ?? string.Empty });
+        }
 
         public static void AddChoice(string text) =>
             Add(new Entry { speaker = string.Empty, text = text ?? string.Empty, choice = true });
 
-        public static void Clear() => entries.Clear();
+        public static void Clear()
+        {
+            entries.Clear();
+            LineCount = 0;
+        }
 
         /// <summary>세이브 슬롯에 보여 줄 마지막 대사 한 줄 ("화자: 대사", 태그 없이, 길면 자름).</summary>
         public static string Preview(int maxLength = 46)

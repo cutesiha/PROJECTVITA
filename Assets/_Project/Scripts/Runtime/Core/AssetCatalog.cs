@@ -39,6 +39,8 @@ namespace ProjectVita.Core
             /// <summary>Yarn 대사의 화자 이름 ("주인공: 대사"의 "주인공").</summary>
             public string yarnName;
             public Color nameColor = new Color(0.70f, 0.15f, 0.12f);
+            /// <summary>이름표 앞의 짧은 식별 칩 (예: SR-04). 비어 있으면 칩을 숨긴다.</summary>
+            public string nameTag = "";
             public List<SpriteEntry> expressions = new List<SpriteEntry>();
 
             public const string DefaultExpression = "default";

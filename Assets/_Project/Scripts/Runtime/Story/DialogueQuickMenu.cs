@@ -1,4 +1,6 @@
 using ProjectVita.Core;
+using ProjectVita.UI;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -7,9 +9,9 @@ using UnityEngine.UI;
 namespace ProjectVita.Story
 {
     /// <summary>
-    /// 대사창 오른쪽 위의 로그 / 오토 / 스킵 버튼과 단축키.
-    /// L 또는 휠 위로: 대사 기록, A: 오토, Tab: 스킵 (읽은 대사만), Ctrl 누르는 동안: 빨리감기 (StoryPresenter가 처리).
-    /// 대사창의 자식이라 대사창이 보일 때만 동작한다.
+    /// 오른쪽 위 AUTO / SKIP / LOG 버튼과 단축키 (MENU 버튼은 PauseMenu가 맡는다).
+    /// L 또는 휠 위로: 대사 기록, A: 오토, Tab: 스킵, Ctrl 누르는 동안: 빨리감기 (StoryPresenter가 처리).
+    /// 대사창이 떠 있을 때만 버튼이 보이고 단축키가 동작한다. 켜진 버튼은 시안색이 된다.
     /// </summary>
     public sealed class DialogueQuickMenu : MonoBehaviour
     {
@@ -17,17 +19,17 @@ namespace ProjectVita.Story
         [SerializeField] Button autoButton;
         [SerializeField] Button skipButton;
         [SerializeField] BacklogPanel backlog;
-        [SerializeField] Color onColor = new Color(0.70f, 0.15f, 0.12f);
-
-        ColorBlock autoColors, skipColors;
+        [Tooltip("대사창. 떠 있을 때만 버튼을 보여 준다")]
+        [SerializeField] GameObject dialogueBox;
+        [Tooltip("AUTO/SKIP/LOG 버튼 묶음")]
+        [SerializeField] CanvasGroup dialogueGroup;
 
         void Awake()
         {
-            autoColors = autoButton.colors;
-            skipColors = skipButton.colors;
             logButton.onClick.AddListener(() => { Deselect(); OpenLog(); });
             autoButton.onClick.AddListener(() => { Deselect(); DialogueModes.SetAuto(!DialogueModes.Auto); });
             skipButton.onClick.AddListener(() => { Deselect(); DialogueModes.SetSkip(!DialogueModes.Skip); });
+            if (dialogueGroup != null) dialogueGroup.alpha = 0f;
         }
 
         void OnEnable()
@@ -38,9 +40,18 @@ namespace ProjectVita.Story
 
         void OnDisable() => DialogueModes.Changed -= Refresh;
 
+        bool DialogueActive => dialogueBox == null || dialogueBox.activeSelf;
+
         void Update()
         {
-            if (GamePause.IsPaused || EpisodeFlow.IsLoading) return;
+            bool active = DialogueActive;
+            if (dialogueGroup != null)
+            {
+                dialogueGroup.alpha = Mathf.MoveTowards(dialogueGroup.alpha, active ? 1f : 0f, Time.unscaledDeltaTime / 0.25f);
+                dialogueGroup.interactable = dialogueGroup.blocksRaycasts = active;
+            }
+
+            if (!active || GamePause.IsPaused || EpisodeFlow.IsLoading) return;
 
             var kb = Keyboard.current;
             if (kb != null)
@@ -61,19 +72,35 @@ namespace ProjectVita.Story
 
         void Refresh()
         {
-            Paint(autoButton, autoColors, DialogueModes.Auto);
-            Paint(skipButton, skipColors, DialogueModes.Skip);
+            Paint(autoButton, DialogueModes.Auto);
+            Paint(skipButton, DialogueModes.Skip);
         }
 
-        void Paint(Button button, ColorBlock original, bool on)
+        /// <summary>켜진 버튼: 바탕은 옅은 시안, 테두리와 아이콘, 글자는 시안.</summary>
+        static void Paint(Button button, bool on)
         {
-            var c = original;
-            if (on)
+            // 바탕 색은 버튼의 상태 색(ColorBlock)이 정한다. 바탕 그림은 흰색이다.
+            var colors = button.colors;
+            colors.normalColor = colors.selectedColor = on ? new Color32(18, 44, 66, 244) : UITheme.Panel;
+            colors.highlightedColor = on ? new Color32(24, 58, 86, 248) : UITheme.PanelHover;
+            button.colors = colors;
+            var line = button.transform.Find("Content/Line")?.GetComponent<Image>();
+            if (line != null) line.color = on ? UITheme.CyanLine : UITheme.LineDim;
+            var hover = button.GetComponent<UIHoverFx>();
+            var icon = button.transform.Find("Content/Icon")?.GetComponent<Image>();
+            var label = button.transform.Find("Content/Label")?.GetComponent<TMP_Text>();
+            var iconColor = on ? UITheme.Cyan : UITheme.Periwinkle;
+            var labelColor = on ? UITheme.Cyan : UITheme.TextDim;
+            if (icon != null)
             {
-                c.normalColor = onColor;
-                c.selectedColor = onColor;
+                icon.color = iconColor;
+                hover?.SetTintBase(icon, iconColor);
             }
-            button.colors = c;
+            if (label != null)
+            {
+                label.color = labelColor;
+                hover?.SetTintBase(label, labelColor);
+            }
         }
 
         /// <summary>

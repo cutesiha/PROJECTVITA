@@ -163,7 +163,7 @@ namespace ProjectVita.EditorTools
                         Debug.LogWarning($"[Catalog] Characters.csv {row.LineNumber}행: character_id '{id}'가 겹친다.");
                         continue;
                     }
-                    var entry = new AssetCatalog.CharacterEntry { id = id, yarnName = row["yarn_name"] };
+                    var entry = new AssetCatalog.CharacterEntry { id = id, yarnName = row["yarn_name"], nameTag = row["name_tag"] };
                     if (string.IsNullOrEmpty(entry.yarnName)) entry.yarnName = id;
                     string color = row["name_color"];
                     if (!string.IsNullOrEmpty(color))

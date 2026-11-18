@@ -1,5 +1,6 @@
 using ProjectVita.Core;
 using ProjectVita.Story;
+using ProjectVita.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
@@ -7,14 +8,15 @@ using UnityEngine.UI;
 namespace ProjectVita.Menus
 {
     /// <summary>
-    /// 일시정지 메뉴 (Story, Exploration, Battle 씬). Esc 또는 오른쪽 위 메뉴 버튼으로 연다.
+    /// 일시정지 메뉴 (Story, Exploration, Battle 씬). Esc 또는 오른쪽 위 MENU 버튼으로 연다.
+    /// 창이 살짝 커지며 올라오고, 항목이 위에서부터 차례로 나타난다.
     /// 열려 있는 동안 시간이 멈추고(timeScale 0) 대사 넘기기 입력을 받지 않는다. BGM은 계속 나온다.
     /// 열기 직전에 화면을 찍어 두고, 저장할 때 슬롯 썸네일로 쓴다.
-    /// Esc는 위에 열린 것부터 닫는다: 슬롯 → 설정 → 대사 기록 → 메뉴.
+    /// Esc는 위에 열린 것부터 닫는다: 확인창 → 슬롯 → 설정 → 대사 기록 → 메뉴.
     /// </summary>
     public sealed class PauseMenu : MonoBehaviour
     {
-        [SerializeField] GameObject panel;
+        [SerializeField] UIPanelAnim panel;
         [SerializeField] Button openButton;
         [SerializeField] Button resumeButton;
         [SerializeField] Button backlogButton;
@@ -27,13 +29,16 @@ namespace ProjectVita.Menus
         [SerializeField] SaveSlotPanel slots;
         [Tooltip("대사 기록. 전투 씬에는 없다.")]
         [SerializeField] BacklogPanel backlog;
+        [SerializeField] ConfirmDialog confirm;
 
         Texture2D thumbnail;
         bool opening;
 
+        bool IsOpen => panel.IsShown;
+
         void Awake()
         {
-            panel.SetActive(false);
+            panel.HideInstant();
             openButton.onClick.AddListener(Open);
             resumeButton.onClick.AddListener(Close);
             if (backlogButton != null)
@@ -43,20 +48,22 @@ namespace ProjectVita.Menus
             }
             saveButton.onClick.AddListener(() => slots.Open(SaveSlotPanel.Mode.Save, true, thumbnail));
             loadButton.onClick.AddListener(() => slots.Open(SaveSlotPanel.Mode.Load, true, null));
-            slots.Loaded += () => panel.SetActive(false); // 씬이 바뀔 때까지 일시정지는 그대로 둔다
+            slots.Loaded += () => panel.Hide(); // 씬이 바뀔 때까지 일시정지는 그대로 둔다
             settingsButton.onClick.AddListener(() => settings.Open());
-            titleButton.onClick.AddListener(() =>
-            {
-                Close();
-                EpisodeFlow.GoTitle();
-            });
-            quitButton.onClick.AddListener(QuitGame.Quit);
+            titleButton.onClick.AddListener(() => confirm.Show("CONFIRM", "TO TITLE", "타이틀로",
+                "타이틀 화면으로 돌아갑니다.\n마지막 저장 이후의 진행은 <b>저장되지 않습니다</b>.", "타이틀로", true, () =>
+                {
+                    Close();
+                    EpisodeFlow.GoTitle();
+                }));
+            quitButton.onClick.AddListener(() => confirm.Show("CONFIRM", "QUIT GAME", "종료",
+                "정말 <b>게임을 종료</b>하시겠습니까?", "종료", true, QuitGame.Quit));
         }
 
         void OnDestroy()
         {
             // 일시정지한 채로 씬이 바뀌어도 시간이 멈춰 있지 않게 한다.
-            if (panel != null && panel.activeSelf) GamePause.Set(false);
+            if (panel != null && panel.IsShown) GamePause.Set(false);
             if (thumbnail != null) Destroy(thumbnail);
         }
 
@@ -65,16 +72,17 @@ namespace ProjectVita.Menus
             var kb = Keyboard.current;
             if (kb == null || !kb.escapeKey.wasPressedThisFrame || EpisodeFlow.IsLoading || opening) return;
 
-            if (slots.IsOpen) slots.Close();
+            if (confirm != null && confirm.IsOpen) confirm.Cancel();
+            else if (slots.IsOpen) slots.Close();
             else if (settings.IsOpen) settings.Close();
             else if (backlog != null && backlog.IsOpen) backlog.Close();
-            else if (panel.activeSelf) Close();
+            else if (IsOpen) Close();
             else Open();
         }
 
         async void Open()
         {
-            if (EpisodeFlow.IsLoading || opening || panel.activeSelf) return;
+            if (EpisodeFlow.IsLoading || opening || IsOpen) return;
             // 대사 기록을 보다가 메뉴 버튼을 누른 경우: 기록을 닫고 연다 (기록이 일시정지를 풀어 버리지 않게).
             if (backlog != null && backlog.IsOpen) backlog.Close();
             opening = true;
@@ -98,7 +106,7 @@ namespace ProjectVita.Menus
             opening = false;
             saveButton.interactable = SaveSystem.CanSaveNow;
             loadButton.interactable = SaveSystem.HasAnySave;
-            panel.SetActive(true);
+            panel.Show();
 
             async Awaitable Capture()
             {
@@ -111,10 +119,11 @@ namespace ProjectVita.Menus
 
         void Close()
         {
+            if (confirm != null && confirm.IsOpen) confirm.Cancel();
             if (slots.IsOpen) slots.Close();
             if (settings.IsOpen) settings.Close();
             if (backlog != null && backlog.IsOpen) backlog.Close();
-            panel.SetActive(false);
+            panel.Hide();
             GamePause.Set(false);
         }
     }

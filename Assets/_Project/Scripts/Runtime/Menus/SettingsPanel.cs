@@ -1,78 +1,94 @@
 using ProjectVita.Core;
+using ProjectVita.UI;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace ProjectVita.Menus
 {
     /// <summary>
-    /// 설정 화면: BGM 음량, 효과음 음량, 텍스트 속도, 창 모드. 바꾸면 바로 적용하고, 닫을 때 저장한다.
-    /// 타이틀과 일시정지 메뉴가 같이 쓴다.
+    /// 설정 화면. 창이 페이드되며 나타난다. 바꾸면 바로 적용하고, 닫을 때 저장한다. 타이틀과 일시정지 메뉴가 같이 쓴다.
+    /// - 텍스트: 텍스트 속도, 오토 속도, 읽은 대사만 스킵
+    /// - 화면: 스캔라인, 노이즈, 화면 흔들림, 전체 화면
+    /// - 사운드: BGM, 효과음
     /// </summary>
     public sealed class SettingsPanel : MonoBehaviour
     {
-        [SerializeField] GameObject root;
-        [SerializeField] Slider bgmSlider;
-        [SerializeField] TMP_Text bgmValue;
-        [SerializeField] Slider sfxSlider;
-        [SerializeField] TMP_Text sfxValue;
+        [SerializeField] UIPanelAnim panel;
         [SerializeField] Slider textSpeedSlider;
         [SerializeField] TMP_Text textSpeedValue;
         [SerializeField] Slider autoSpeedSlider;
         [SerializeField] TMP_Text autoSpeedValue;
-        [SerializeField] Button windowModeButton;
-        [SerializeField] TMP_Text windowModeLabel;
+        [SerializeField] UIToggleSwitch skipReadOnlyToggle;
+        [SerializeField] UIToggleSwitch scanlinesToggle;
+        [SerializeField] UIToggleSwitch filmGrainToggle;
+        [SerializeField] UIToggleSwitch screenShakeToggle;
+        [SerializeField] UIToggleSwitch fullscreenToggle;
+        [SerializeField] Slider bgmSlider;
+        [SerializeField] TMP_Text bgmValue;
+        [SerializeField] Slider sfxSlider;
+        [SerializeField] TMP_Text sfxValue;
         [SerializeField] Button closeButton;
 
-        public bool IsOpen => root != null && root.activeSelf;
+        public bool IsOpen => panel != null && panel.IsShown;
 
         void Awake()
         {
-            bgmSlider.minValue = 0;
-            bgmSlider.maxValue = 10;
-            bgmSlider.wholeNumbers = true;
-            sfxSlider.minValue = 0;
-            sfxSlider.maxValue = 10;
-            sfxSlider.wholeNumbers = true;
-            textSpeedSlider.minValue = GameSettings.MinTextSpeed;
-            textSpeedSlider.maxValue = GameSettings.MaxTextSpeed;
-            textSpeedSlider.wholeNumbers = true;
-            autoSpeedSlider.minValue = GameSettings.MinAutoSpeed;
-            autoSpeedSlider.maxValue = GameSettings.MaxAutoSpeed;
-            autoSpeedSlider.wholeNumbers = true;
-
-            bgmSlider.onValueChanged.AddListener(v => { GameSettings.SetBgmVolume(v / 10f); Refresh(); });
-            sfxSlider.onValueChanged.AddListener(v => { GameSettings.SetSfxVolume(v / 10f); Refresh(); });
-            textSpeedSlider.onValueChanged.AddListener(v => { GameSettings.SetTextSpeed((int)v); Refresh(); });
-            autoSpeedSlider.onValueChanged.AddListener(v => { GameSettings.SetAutoSpeed((int)v); Refresh(); });
-            windowModeButton.onClick.AddListener(() => { GameSettings.SetFullscreen(!GameSettings.Fullscreen); Refresh(); });
+            Setup(textSpeedSlider, GameSettings.MinTextSpeed, GameSettings.MaxTextSpeed, v => GameSettings.SetTextSpeed((int)v));
+            Setup(autoSpeedSlider, GameSettings.MinAutoSpeed, GameSettings.MaxAutoSpeed, v => GameSettings.SetAutoSpeed((int)v));
+            Setup(bgmSlider, 0, 10, v => GameSettings.SetBgmVolume(v / 10f));
+            Setup(sfxSlider, 0, 10, v => GameSettings.SetSfxVolume(v / 10f));
+            skipReadOnlyToggle.Changed += GameSettings.SetSkipReadOnly;
+            scanlinesToggle.Changed += GameSettings.SetScanlines;
+            filmGrainToggle.Changed += GameSettings.SetFilmGrain;
+            screenShakeToggle.Changed += GameSettings.SetScreenShake;
+            fullscreenToggle.Changed += GameSettings.SetFullscreen;
             closeButton.onClick.AddListener(Close);
-            root.SetActive(false);
+            panel.HideInstant();
+        }
+
+        void Setup(Slider slider, int min, int max, System.Action<float> apply)
+        {
+            slider.minValue = min;
+            slider.maxValue = max;
+            slider.wholeNumbers = true;
+            slider.onValueChanged.AddListener(v =>
+            {
+                apply(v);
+                Refresh();
+            });
         }
 
         public void Open()
         {
-            bgmSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.BgmVolume * 10f));
-            sfxSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.SfxVolume * 10f));
             textSpeedSlider.SetValueWithoutNotify(GameSettings.TextSpeed);
             autoSpeedSlider.SetValueWithoutNotify(GameSettings.AutoSpeed);
+            bgmSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.BgmVolume * 10f));
+            sfxSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.SfxVolume * 10f));
+            skipReadOnlyToggle.SetWithoutNotify(GameSettings.SkipReadOnly);
+            scanlinesToggle.SetWithoutNotify(GameSettings.Scanlines);
+            filmGrainToggle.SetWithoutNotify(GameSettings.FilmGrain);
+            screenShakeToggle.SetWithoutNotify(GameSettings.ScreenShake);
+            fullscreenToggle.SetWithoutNotify(GameSettings.Fullscreen);
             Refresh();
-            root.SetActive(true);
+            panel.Show();
         }
 
         public void Close()
         {
+            if (!IsOpen) return;
             GameSettings.Save();
-            root.SetActive(false);
+            panel.Hide();
+            EventSystem.current?.SetSelectedGameObject(null);
         }
 
         void Refresh()
         {
-            bgmValue.text = Mathf.RoundToInt(GameSettings.BgmVolume * 10f).ToString();
-            sfxValue.text = Mathf.RoundToInt(GameSettings.SfxVolume * 10f).ToString();
             textSpeedValue.text = GameSettings.TextSpeed >= GameSettings.MaxTextSpeed ? "즉시" : GameSettings.TextSpeed.ToString();
             autoSpeedValue.text = GameSettings.AutoSpeed.ToString();
-            windowModeLabel.text = GameSettings.Fullscreen ? "화면: 전체 화면" : "화면: 창 모드";
+            bgmValue.text = Mathf.RoundToInt(GameSettings.BgmVolume * 100f) + "%";
+            sfxValue.text = Mathf.RoundToInt(GameSettings.SfxVolume * 100f) + "%";
         }
     }
 }

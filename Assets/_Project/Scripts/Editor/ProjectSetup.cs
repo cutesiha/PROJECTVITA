@@ -181,7 +181,7 @@ namespace ProjectVita.EditorTools
             Debug.Log("[Setup] TMP: 기본 폰트 = Pretendard-Regular SDF (Dynamic), Modern Hangul Line Breaking = ON\n[Setup] 1단계 기본 세팅 완료.");
         }
 
-        static TMP_FontAsset GetOrCreateFontAsset(string fontPath, string assetPath)
+        internal static TMP_FontAsset GetOrCreateFontAsset(string fontPath, string assetPath, int atlasSize = AtlasSize)
         {
             var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(assetPath);
             if (existing != null) return existing;
@@ -194,7 +194,7 @@ namespace ProjectVita.EditorTools
             }
 
             var fa = TMP_FontAsset.CreateFontAsset(font, SamplingPointSize, AtlasPadding, GlyphRenderMode.SDFAA,
-                AtlasSize, AtlasSize, AtlasPopulationMode.Dynamic, enableMultiAtlasSupport: true);
+                atlasSize, atlasSize, AtlasPopulationMode.Dynamic, enableMultiAtlasSupport: true);
             if (fa == null) return null;
 
             // 아웃라인, 글로우 같은 연출을 쓰려고 Mobile 대신 일반 Distance Field 셰이더를 쓴다.
